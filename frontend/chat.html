@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TaskFlow - 채팅</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="theme.js"></script>
+<script src="api.js"></script>
+<script src="nav.js"></script>
+</head>
+
+<body class="bg-page dark:bg-canvas text-ink dark:text-fg font-sans antialiased min-h-screen flex flex-col">
+
+<div id="navSlot"></div>
+
+<div class="flex-1 w-full max-w-2xl mx-auto flex flex-col px-3 sm:px-4 py-4">
+  <div class="flex items-center justify-between mb-2">
+    <h1 class="text-sm font-extrabold">팀 채팅</h1>
+    <span id="pollDot" class="text-[11px] text-ink-3 dark:text-dim">● 5초마다 새로고침</span>
+  </div>
+
+  <div id="messages" class="flex-1 min-h-[50vh] space-y-3 overflow-y-auto py-2"></div>
+
+  <div id="emptyState" class="hidden flex-1 grid place-items-center text-center py-10">
+    <div>
+      <div class="w-16 h-16 mx-auto mb-3 rounded-full bg-blue-50 dark:bg-chip grid place-items-center text-3xl">💬</div>
+      <p class="font-bold">아직 대화가 없습니다</p>
+      <p class="text-[12px] text-ink-2 dark:text-dim mt-1">첫 메시지를 보내 팀원과 대화를 시작하세요</p>
+    </div>
+  </div>
+
+  <div class="mt-2">
+    <div class="flex items-end gap-2">
+      <div class="flex-1">
+        <textarea id="input" rows="1" maxlength="1000" placeholder="메시지 입력 (1000자 이내)..."
+          class="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-chip border border-line dark:border-edge text-sm resize-none
+                 focus:outline-none focus:border-blue-dot focus:ring-2 focus:ring-blue-dot/25 transition"></textarea>
+        <p id="counter" class="mt-1 text-[11px] text-ink-3 dark:text-dim text-right">0 / 1000</p>
+      </div>
+      <button id="sendBtn" class="h-11 px-4 rounded-xl bg-ink dark:bg-fg text-white dark:text-canvas text-sm font-bold hover:opacity-90 transition">전송</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  // lastSince: 폴링 커서 - 마지막으로 받은 메시지의 created_at을 다음 요청의 since=로 보낸다.
+  let me = null, lastSince = null, pollTimer = null;
+
+  // 메시지 본문을 innerHTML에 넣기 전 이스케이프해 XSS를 방지한다.
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  // 메시지 하나를 말풍선 HTML로 변환. 내가 보낸 메시지는 오른쪽 파란색, 남의 메시지는
+  // 왼쪽 흰색 + 발신자 이메일 표시. 본인 메시지에만 호버 시 삭제 아이콘이 나타난다.
+  function bubble(m) {
+    const mine = m.user_id === me.id;
+    const time = new Date(m.created_at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+    return `
+      <div class="flex ${mine ? "justify-end" : "justify-start"} group" data-id="${m.id}">
+        <div class="max-w-[75%]">
+          ${!mine ? `<p class="text-[11px] text-ink-3 dark:text-dim mb-1 px-1">${escapeHtml(m.user_email)}</p>` : ""}
+          <div class="flex items-center gap-1.5 ${mine ? "flex-row-reverse" : ""}">
+            <div class="rounded-2xl px-3.5 py-2 text-sm ${
+              mine
+                ? "bg-blue-dot text-white rounded-br-sm"
+                : "bg-white dark:bg-surface border border-line dark:border-edge rounded-bl-sm"
+            }">${escapeHtml(m.content)}</div>
+            ${mine ? `<button data-del="${m.id}" class="opacity-0 group-hover:opacity-100 text-ink-3 dark:text-dim hover:text-red-text transition text-xs">🗑</button>` : ""}
+          </div>
+          <p class="text-[10px] text-ink-3 dark:text-dim mt-0.5 px-1 ${mine ? "text-right" : ""}">${time}</p>
+        </div>
+      </div>`;
+  }
+
+  // 새로 받은 메시지들을 목록 끝에 붙인다. 사용자가 이미 맨 아래를 보고 있었을 때만
+  // 자동으로 스크롤을 따라가고(wasScrolledDown), 위로 스크롤해서 지난 대화를 보는 중이면
+  // 화면을 강제로 이동시키지 않는다.
+  function appendMessages(list) {
+    if (!list.length) return;
+    const wasScrolledDown = $("messages").scrollTop + $("messages").clientHeight >= $("messages").scrollHeight - 40;
+    $("messages").insertAdjacentHTML("beforeend", list.map(bubble).join(""));
+    document.querySelectorAll("[data-del]").forEach((btn) => {
+      btn.onclick = async () => {
+        try {
+          await window.api(`/messages/${btn.dataset.del}`, { method: "DELETE" });
+          btn.closest("[data-id]").remove();
+        } catch (err) {
+          alert(err.message);
+        }
+      };
+    });
+    if (wasScrolledDown) $("messages").scrollTop = $("messages").scrollHeight;
+  }
+
+  // 5초 간격으로 호출되는 폴링 함수. since 파라미터 없이 첫 호출하면 최근 50개를,
+  // 이후에는 since= 이후 새로 생긴 메시지만 받아온다 (메시지 누락 0건을 보장하는 방식).
+  async function poll() {
+    try {
+      const path = lastSince
+        ? `/teams/${me.team_id}/messages?since=${encodeURIComponent(lastSince)}`
+        : `/teams/${me.team_id}/messages`;
+      const list = await window.api(path);
+      if (list.length) {
+        lastSince = list[list.length - 1].created_at;
+        $("emptyState").classList.add("hidden");
+        appendMessages(list);
+      } else if (!lastSince) {
+        // 최초 진입인데 메시지가 하나도 없으면 빈 상태(empty state) 화면 유지.
+        $("emptyState").classList.remove("hidden");
+      }
+      $("pollDot").textContent = "● 5초마다 새로고침";
+    } catch (err) {
+      // 네트워크 오류 등으로 폴링이 실패해도 다음 setInterval 틱에서 자동 재시도된다.
+      $("pollDot").textContent = "⚠ 연결 끊김 · 재시도 중";
+    }
+  }
+
+  // 입력할 때마다 글자 수 카운터를 갱신하고, 1000자 초과 시 빨간색으로 경고 표시.
+  $("input").addEventListener("input", () => {
+    $("counter").textContent = `${$("input").value.length} / 1000`;
+    $("counter").classList.toggle("text-red-text", $("input").value.length > 1000);
+  });
+
+  // Enter로 전송, Shift+Enter는 줄바꿈 (일반적인 채팅 UX 관례).
+  $("input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      send();
+    }
+  });
+  $("sendBtn").onclick = send;
+
+  // 메시지 전송 후 곧바로 poll()을 호출해 내가 보낸 메시지를 지연 없이 화면에 반영한다.
+  async function send() {
+    const content = $("input").value.trim();
+    if (!content || content.length > 1000) return;
+    $("sendBtn").disabled = true;
+    try {
+      await window.api(`/teams/${me.team_id}/messages`, { method: "POST", body: { content } });
+      $("input").value = "";
+      $("counter").textContent = "0 / 1000";
+      await poll();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      $("sendBtn").disabled = false;
+    }
+  }
+
+  // 진입점: 로그인 + 팀 소속 확인 후 최초 폴링을 실행하고, 이후 5초마다 반복한다.
+  (async () => {
+    me = await window.routeGuard({ requireAuth: true, requireTeam: true });
+    if (!me) return;
+    window.renderNav("chat", me);
+    $("emptyState").classList.remove("hidden");
+    await poll();
+    pollTimer = setInterval(poll, 5000);
+  })();
+</script>
+</body>
+</html>

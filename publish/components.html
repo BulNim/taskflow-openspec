@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TaskFlow - 스타일 가이드</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="theme.js"></script>
+</head>
+
+<body class="bg-page dark:bg-canvas text-ink dark:text-fg font-sans antialiased min-h-screen flex flex-col">
+
+<header class="sticky top-0 z-30 bg-white dark:bg-canvas border-b border-line dark:border-edge">
+  <div class="max-w-6xl mx-auto px-4 h-14 flex items-center gap-3">
+    <div class="flex items-center gap-2 shrink-0">
+      <div class="w-7 h-7 rounded-lg bg-ink dark:bg-fg grid place-items-center text-white dark:text-canvas font-extrabold text-sm">T</div>
+      <span class="font-extrabold tracking-tight">TaskFlow</span>
+      <span class="text-ink-3 dark:text-dim px-1">/</span>
+    </div>
+    <span class="text-sm font-bold">스타일 가이드</span>
+    <div class="ml-auto flex items-center gap-2" id="themeSlot"></div>
+  </div>
+  <nav id="nav" class="max-w-6xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto"></nav>
+</header>
+
+<main class="flex-1 w-full max-w-6xl mx-auto px-4 py-5 space-y-4" id="main"></main>
+
+<footer class="max-w-6xl mx-auto w-full px-4 pb-8 pt-2">
+  <p class="text-center text-[11px] text-ink-3 dark:text-dim">
+    theme.js 의 window.UI / STRIPE / LABEL 토큰 기준. 새 화면은 이 문자열을 그대로 복사해서 사용
+  </p>
+</footer>
+
+<script>
+  document.getElementById("themeSlot").innerHTML = window.THEME_BTN;
+  window.initTheme();
+
+  const UI = window.UI, S = window.STRIPE, L = window.LABEL;
+  const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  // ── 뼈대 헬퍼 ───────────────────────────────────────────
+  const codeBox = (s) => `
+    <pre class="overflow-x-auto rounded-xl bg-page dark:bg-chip border border-line dark:border-edge px-3 py-2.5"><code
+      class="block text-[11px] leading-relaxed font-mono text-ink-2 dark:text-dim whitespace-pre-wrap break-all">${esc(s)}</code></pre>`;
+
+  const row = (name, demo, code, note = "") => `
+    <div class="grid gap-3 md:grid-cols-2 items-start py-4 border-t border-line dark:border-edge first:border-t-0 first:pt-0">
+      <div class="min-w-0">
+        <p class="text-[11px] font-extrabold tracking-widest text-ink-3 dark:text-dim">${name}</p>
+        <div class="mt-2 flex flex-wrap items-center gap-2">${demo}</div>
+        ${note ? `<p class="mt-2 text-[11px] text-ink-3 dark:text-dim">${note}</p>` : ""}
+      </div>
+      <div class="min-w-0">${codeBox(code)}</div>
+    </div>`;
+
+  const full = (name, demo, note = "") => `
+    <div class="py-4 border-t border-line dark:border-edge first:border-t-0 first:pt-0">
+      <p class="text-[11px] font-extrabold tracking-widest text-ink-3 dark:text-dim">${name}</p>
+      <div class="mt-2">${demo}</div>
+      ${note ? `<p class="mt-2 text-[11px] text-ink-3 dark:text-dim">${note}</p>` : ""}
+    </div>`;
+
+  const section = (id, no, title, sub, inner) => `
+    <section id="${id}" class="scroll-mt-28 rounded-2xl bg-white dark:bg-surface border border-line dark:border-edge p-5">
+      <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1 mb-3">
+        <span class="font-mono text-[11px] font-bold text-ink-3 dark:text-dim">${no}</span>
+        <h2 class="text-sm font-extrabold">${title}</h2>
+        <p class="text-[11px] text-ink-3 dark:text-dim">${sub}</p>
+      </div>
+      ${inner}
+    </section>`;
+
+  const COLORS = [
+    ["blue",   "#4CA0E5", "#1565B0", "TODO · 정보 · 링크"],
+    ["orange", "#EF8B22", "#A65A00", "DOING · 주의 · 대기"],
+    ["green",  "#00A65A", "#007A42", "DONE · 성공 · 온라인"],
+    ["red",    "#E1232B", "#C21620", "에러 · 삭제 · 연결 끊김"],
+    ["purple", "#7C40A2", "#6B3590", "owner · 선택 · 강조"]
+  ];
+
+  // ── 1. 색 팔레트 ────────────────────────────────────────
+  const palette = `
+    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      ${COLORS.map(([c, dot, text, use]) => `
+        <div class="rounded-xl bg-white dark:bg-surface border border-line dark:border-edge ${S[c]} p-3.5">
+          <div class="flex items-center gap-2.5">
+            <span class="w-8 h-8 rounded-lg bg-${c}-dot shrink-0"></span>
+            <div class="min-w-0">
+              <p class="text-[13px] font-extrabold ${L[c]}">${c}</p>
+              <p class="text-[11px] text-ink-3 dark:text-dim truncate">${use}</p>
+            </div>
+          </div>
+          <div class="mt-2.5 space-y-1 font-mono text-[10.5px] text-ink-2 dark:text-dim break-all">
+            <p><span class="font-bold text-ink dark:text-fg">dot</span>&nbsp; ${dot} &nbsp;bg-${c}-dot</p>
+            <p><span class="font-bold text-ink dark:text-fg">text</span> ${text} &nbsp;text-${c}-text</p>
+            <p>${esc(S[c])}</p>
+          </div>
+        </div>`).join("")}
+    </div>`;
+
+  const grays = [
+    ["page",    "#f4f5f6", "라이트 배경"],
+    ["ink",     "#141414", "라이트 본문"],
+    ["ink-2",   "#55595f", "보조 문구"],
+    ["ink-3",   "#8b9097", "캡션 · 비활성"],
+    ["line",    "#e4e6e9", "라이트 테두리"],
+    ["canvas",  "#0d0d0f", "다크 배경"],
+    ["surface", "#17181c", "다크 카드"],
+    ["chip",    "#1c1e23", "다크 입력 · 칩"],
+    ["fg",      "#f2f3f5", "다크 본문"],
+    ["dim",     "#7c828b", "다크 보조"],
+    ["edge",    "#23252a", "다크 테두리"]
+  ];
+  const grayGrid = `
+    <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+      ${grays.map(([n, hex, use]) => `
+        <div class="flex items-center gap-2.5 rounded-xl bg-page dark:bg-chip border border-line dark:border-edge px-3 py-2">
+          <span class="w-6 h-6 rounded-md border border-line dark:border-edge shrink-0" style="background:${hex}"></span>
+          <span class="font-mono text-[11px] font-bold">${n}</span>
+          <span class="font-mono text-[11px] text-ink-3 dark:text-dim">${hex}</span>
+          <span class="ml-auto text-[11px] text-ink-3 dark:text-dim truncate">${use}</span>
+        </div>`).join("")}
+    </div>`;
+
+  // ── 2. 버튼 ─────────────────────────────────────────────
+  const buttons =
+    row("PRIMARY", `<button class="${UI.btnPrimary}">저장</button>`,
+        "window.UI.btnPrimary\n\n" + UI.btnPrimary,
+        "화면당 1개. 가장 중요한 동작에만 사용") +
+    row("GHOST", `<button class="${UI.btnGhost}">취소</button>`,
+        "window.UI.btnGhost\n\n" + UI.btnGhost) +
+    row("DANGER", `<button class="${UI.btnDanger}">삭제</button>`,
+        "window.UI.btnDanger\n\n" + UI.btnDanger,
+        "되돌릴 수 없는 동작에만 사용") +
+    row("DISABLED",
+        `<button disabled class="${UI.btnPrimary}">저장</button>
+         <button disabled class="${UI.btnGhost} opacity-60">취소</button>`,
+        "disabled 속성만 추가. 클래스에 이미 포함\n\ndisabled:opacity-60",
+        "disabled 속성 없이 색만 흐리게 두지 말 것") +
+    row("작은 버튼 · 아이콘 버튼",
+        `<button class="h-9 px-3 rounded-lg bg-white dark:bg-chip border border-line dark:border-edge text-[12px] font-bold">지금 재시도</button>
+         <button class="w-8 h-8 grid place-items-center rounded-lg text-ink-3 dark:text-dim hover:bg-page dark:hover:bg-edge transition">
+           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+         </button>`,
+        "h-9 px-3 rounded-lg bg-white dark:bg-chip border border-line dark:border-edge text-[12px] font-bold\n\n" +
+        "w-8 h-8 grid place-items-center rounded-lg text-ink-3 dark:text-dim hover:bg-page dark:hover:bg-edge transition");
+
+  // ── 3. 입력 필드 ────────────────────────────────────────
+  const wrap = (h) => `<div class="w-full max-w-[340px]">${h}</div>`;
+  const inputs =
+    row("기본 + 라벨",
+        wrap(`<label class="${UI.label}">이메일</label><input placeholder="user@example.com" class="${UI.input}">`),
+        "window.UI.label\n" + UI.label + "\n\nwindow.UI.input\n" + UI.input) +
+    row("포커스",
+        wrap(`<input value="user@example.com" class="${UI.input} border-blue-dot ring-2 ring-blue-dot/25">`),
+        "UI.input + border-blue-dot ring-2 ring-blue-dot/25",
+        "포커스 링은 blue 고정. 다른 색 사용 금지") +
+    row("에러",
+        wrap(`<input value="user@@example" class="${UI.input} border-red-dot">
+              <p class="${UI.errText}">이메일 형식이 올바르지 않음</p>`),
+        "UI.input + border-red-dot\n\nwindow.UI.errText\n" + UI.errText) +
+    row("도움말",
+        wrap(`<input placeholder="ABCD-1234" class="${UI.input} font-mono tracking-widest uppercase">
+              <p class="${UI.help}">형식 - 대문자 4 + 숫자 4 (하이픈 포함)</p>`),
+        "window.UI.help\n" + UI.help) +
+    row("여러 줄 입력",
+        wrap(`<textarea rows="2" placeholder="메시지 입력 (1000자 이내)..."
+               class="w-full px-3.5 py-2.5 rounded-xl bg-page dark:bg-chip border border-line dark:border-edge text-sm resize-none
+                      placeholder:text-ink-3 dark:placeholder:text-dim focus:outline-none focus:border-blue-dot focus:ring-2 focus:ring-blue-dot/25 transition"></textarea>`),
+        "w-full px-3.5 py-2.5 rounded-xl bg-page dark:bg-chip border border-line dark:border-edge text-sm resize-none " +
+        "placeholder:text-ink-3 dark:placeholder:text-dim focus:outline-none focus:border-blue-dot focus:ring-2 focus:ring-blue-dot/25 transition");
+
+  // ── 4. 카드 ─────────────────────────────────────────────
+  const cardDemo = (c) => `
+    <article class="${UI.card} ${S[c]} px-3.5 py-3 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-150">
+      <h3 class="text-[14px] font-bold leading-snug">JWT 미들웨어 구현</h3>
+      <div class="mt-1.5 flex items-center gap-2 text-[11px] font-semibold">
+        <span class="font-mono text-ink-3 dark:text-dim">#110</span>
+        <span class="text-ink-3 dark:text-dim">·</span>
+        <span class="${L[c]}">@me</span>
+      </div>
+    </article>`;
+  const cards =
+    full("좌측 6px 띠 5색",
+         `<div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">${COLORS.map(([c]) => cardDemo(c)).join("")}</div>`,
+         "카드 배경은 항상 무채색. 색은 좌측 띠와 라벨에만 사용") +
+    row("클래스 조합",
+        `<span class="text-[12px] text-ink-2 dark:text-dim">위 카드와 동일</span>`,
+        "window.UI.card + window.STRIPE.blue\n\n" + UI.card + "\n" + S.blue,
+        "dark:border-l-XXX-dot 를 빼면 dark:border-edge 가 좌측 색을 덮어씀") +
+    row("패널 (섹션 컨테이너)",
+        `<div class="${UI.panel} px-4 py-3 text-[12px] font-bold">팀 멤버 3</div>`,
+        "window.UI.panel\n" + UI.panel);
+
+  // ── 5. 배지 / 태그 ──────────────────────────────────────
+  const colBadge = (c, t) => `
+    <span class="${UI.badge} bg-white dark:bg-chip border border-line dark:border-edge
+                 border-l-[3px] border-l-${c}-dot dark:border-l-${c}-dot ${L[c]}">${t}</span>`;
+  const badges =
+    row("컬럼 배지",
+        colBadge("blue", "TODO") + colBadge("orange", "DOING") + colBadge("green", "DONE"),
+        "window.UI.badge + bg-white dark:bg-chip border border-line dark:border-edge\nborder-l-[3px] border-l-blue-dot dark:border-l-blue-dot text-blue-text dark:text-blue-dot\n\nUI.badge\n" + UI.badge) +
+    row("역할 태그 · 미할당 태그",
+        `<span class="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-purple-dot text-white">owner</span>
+         <span class="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-page dark:bg-chip text-ink-2 dark:text-dim">member</span>
+         <span class="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-page dark:bg-chip text-ink-3 dark:text-dim">미할당</span>`,
+        "px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-purple-dot text-white\n\n" +
+        "px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-page dark:bg-chip text-ink-2 dark:text-dim") +
+    row("필터 칩 (선택 / 미선택)",
+        `<button class="px-3 py-1.5 rounded-full text-xs font-bold bg-ink dark:bg-fg text-white dark:text-canvas">전체</button>
+         <button class="px-3 py-1.5 rounded-full text-xs font-bold bg-white dark:bg-chip border border-line dark:border-edge text-ink-2 dark:text-dim">@me</button>`,
+        "선택   px-3 py-1.5 rounded-full text-xs font-bold bg-ink dark:bg-fg text-white dark:text-canvas\n" +
+        "미선택 px-3 py-1.5 rounded-full text-xs font-bold bg-white dark:bg-chip border border-line dark:border-edge text-ink-2 dark:text-dim") +
+    row("상태 표시 (폴링)",
+        `<span class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-page dark:bg-chip text-[11px] font-bold text-ink-2 dark:text-dim">
+           <span class="w-1.5 h-1.5 rounded-full bg-green-dot animate-pulse"></span>5초마다 새로고침</span>
+         <span class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white dark:bg-chip border border-red-dot text-[11px] font-bold ${L.red}">
+           <span class="w-1.5 h-1.5 rounded-full bg-red-dot animate-pulse"></span>연결 끊김</span>`,
+        "w-1.5 h-1.5 rounded-full bg-green-dot animate-pulse\nflex items-center gap-1.5 px-2.5 py-1 rounded-full bg-page dark:bg-chip text-[11px] font-bold");
+
+  // ── 6. 알림 박스 ────────────────────────────────────────
+  const notices =
+    full("4종 - info / success / warning / error",
+         `<div class="grid gap-2 md:grid-cols-2">
+            ${window.notice("blue",   "아직 팀에 소속되지 않음", "팀 생성 또는 초대 코드 합류 후 칸반 사용 가능")}
+            ${window.notice("green",  "팀 생성 완료",           "초대 코드를 팀원에게 전달")}
+            ${window.notice("orange", "이미 소속된 팀이 있음",   "한 사용자는 한 팀에만 소속 가능")}
+            ${window.notice("red",    "연결 끊김 · 5초 뒤 재시도", "복구 시 since= 파라미터로 누락분 일괄 수신")}
+          </div>`) +
+    row("호출 방법",
+        `<span class="text-[12px] text-ink-2 dark:text-dim">위 4종과 동일</span>`,
+        'window.notice(kind, title, body)\nkind - blue | green | orange | red | purple\n\n' +
+        '<div class="rounded-xl bg-white dark:bg-surface border border-line dark:border-edge ' + S.blue + ' px-4 py-3">\n' +
+        '  <p class="text-[13px] font-bold ' + L.blue + '">제목</p>\n' +
+        '  <p class="text-[12px] text-ink-2 dark:text-dim mt-0.5">본문</p>\n' +
+        '</div>');
+
+  // ── 7. 빈 상태 ──────────────────────────────────────────
+  const emptyBlock = `
+    <div class="grid place-items-center text-center py-10 rounded-xl bg-page dark:bg-chip">
+      <div class="w-12 h-12 rounded-2xl bg-white dark:bg-surface border border-line dark:border-edge ${S.blue}
+                  grid place-items-center ${L.blue}">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H8l-4 4V5a2 2 0 012-2h13a2 2 0 012 2z"/></svg>
+      </div>
+      <p class="mt-3 text-sm font-extrabold">아직 대화 없음</p>
+      <p class="mt-1 text-[12px] text-ink-2 dark:text-dim">첫 메시지 작성으로 팀 대화 시작</p>
+      <button class="${UI.btnPrimary} mt-3">첫 메시지 작성</button>
+    </div>`;
+  const empties =
+    row("아이콘 + 안내 + 다음 행동", emptyBlock,
+        'grid place-items-center text-center py-10 rounded-xl bg-page dark:bg-chip\n\n' +
+        '제목 text-sm font-extrabold\n설명 text-[12px] text-ink-2 dark:text-dim\n버튼 UI.btnPrimary',
+        "빈 상태에는 반드시 다음 행동 버튼을 함께 배치") +
+    row("컬럼 내부 빈 상태",
+        `<div class="w-full max-w-[240px] grid place-items-center py-8 text-center rounded-xl bg-page dark:bg-chip">
+           <p class="text-xs font-semibold text-ink-3 dark:text-dim">카드 없음</p>
+           <button class="mt-2 text-xs font-bold underline">+ 첫 태스크 만들기</button>
+         </div>`,
+        "grid place-items-center py-8 text-center rounded-xl bg-page dark:bg-chip\ntext-xs font-semibold text-ink-3 dark:text-dim");
+
+  // ── 8. 모달 ─────────────────────────────────────────────
+  const modal = `
+    <div class="relative rounded-xl border border-line dark:border-edge bg-black/40 p-6 grid place-items-center">
+      <div class="w-full max-w-[380px] rounded-2xl bg-white dark:bg-surface border border-line dark:border-edge p-5">
+        <div class="flex items-start gap-2 mb-4">
+          <div>
+            <p class="text-[11px] font-mono text-ink-3 dark:text-dim">#110</p>
+            <h3 class="text-base font-extrabold mt-0.5">JWT 미들웨어 구현</h3>
+          </div>
+          <button class="ml-auto w-7 h-7 grid place-items-center rounded-lg text-ink-3 hover:bg-page dark:hover:bg-edge">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <label class="${UI.label}">제목</label>
+        <input value="JWT 미들웨어 구현" class="${UI.input}">
+        <div class="flex gap-2 mt-4">
+          <button class="${UI.btnGhost} flex-1">취소</button>
+          <button class="${UI.btnPrimary} flex-1">저장</button>
+          <button class="${UI.btnDanger}">삭제</button>
+        </div>
+      </div>
+    </div>`;
+  const confirmBox = `
+    <div class="w-full max-w-[340px] rounded-2xl bg-white dark:bg-surface border border-line dark:border-edge ${S.red} p-5">
+      <h3 class="text-sm font-extrabold ${L.red}">카드를 삭제할까요</h3>
+      <p class="text-[12px] text-ink-2 dark:text-dim mt-1">#110 JWT 미들웨어 구현 · 되돌릴 수 없음</p>
+      <div class="flex gap-2 mt-4">
+        <button class="${UI.btnGhost} flex-1">취소</button>
+        <button class="${UI.btnDanger} flex-1">삭제</button>
+      </div>
+    </div>`;
+  const modals =
+    full("모달 - 딤 + 카드", modal,
+         "딤   fixed inset-0 z-50 grid place-items-center px-4  >  absolute inset-0 bg-black/40\n카드 relative w-full max-w-[440px] rounded-2xl bg-white dark:bg-surface border border-line dark:border-edge p-5") +
+    row("확인 다이얼로그", confirmBox,
+        "rounded-2xl bg-white dark:bg-surface border border-line dark:border-edge " + S.red + " p-5",
+        "파괴적 동작은 red 띠 + danger 버튼을 함께 사용");
+
+  // ── 9. 로딩 / 스켈레톤 ──────────────────────────────────
+  const loading =
+    row("스피너",
+        `<span class="inline-block w-5 h-5 rounded-full border-2 border-line dark:border-edge border-t-blue-dot animate-spin"></span>
+         <span class="inline-block w-8 h-8 rounded-full border-2 border-line dark:border-edge border-t-blue-dot animate-spin"></span>`,
+        "inline-block w-5 h-5 rounded-full border-2 border-line dark:border-edge border-t-blue-dot animate-spin") +
+    row("버튼 처리 중",
+        `<button disabled class="${UI.btnPrimary} flex items-center gap-2">
+           <span class="w-3.5 h-3.5 rounded-full border-2 border-white/40 border-t-white dark:border-canvas/40 dark:border-t-canvas animate-spin"></span>
+           처리 중...
+         </button>`,
+        "UI.btnPrimary + disabled + 내부 스피너\nw-3.5 h-3.5 rounded-full border-2 border-white/40 border-t-white animate-spin") +
+    full("스켈레톤",
+        `<div class="grid gap-2 sm:grid-cols-2">
+           <div class="${UI.card} ${S.blue} px-3.5 py-3 space-y-2">
+             <div class="h-3.5 w-2/3 rounded bg-line dark:bg-edge animate-pulse"></div>
+             <div class="h-2.5 w-1/3 rounded bg-line dark:bg-edge animate-pulse"></div>
+           </div>
+           <div class="${UI.card} px-3.5 py-3 space-y-2">
+             <div class="h-3.5 w-1/2 rounded bg-line dark:bg-edge animate-pulse"></div>
+             <div class="h-2.5 w-3/4 rounded bg-line dark:bg-edge animate-pulse"></div>
+           </div>
+         </div>
+         <div class="mt-2">${codeBox("h-3.5 w-2/3 rounded bg-line dark:bg-edge animate-pulse")}</div>`,
+        "스켈레톤은 실제 카드와 같은 높이로. 스피너보다 우선 사용");
+
+  // ── 10. 타이포 ──────────────────────────────────────────
+  const typo =
+    row("화면 제목", `<p class="text-lg font-extrabold tracking-tight">TaskFlow</p>`,
+        "text-lg font-extrabold tracking-tight") +
+    row("섹션 제목", `<p class="text-sm font-extrabold">팀 멤버</p>`, "text-sm font-extrabold") +
+    row("카드 제목", `<p class="text-[14px] font-bold leading-snug">JWT 미들웨어 구현</p>`, "text-[14px] font-bold leading-snug") +
+    row("본문", `<p class="text-[13px] text-ink-2 dark:text-dim">팀 업무를 한 화면에서 추적</p>`,
+        "text-[13px] text-ink-2 dark:text-dim") +
+    row("캡션 · 메타", `<p class="text-[11px] text-ink-3 dark:text-dim">생성 2026-08-05 14:02 · 생성자 @me</p>`,
+        "text-[11px] text-ink-3 dark:text-dim") +
+    row("코드 · 숫자", `<p class="font-mono text-[12px] tabular-nums">#110 · 1,042 / 1,000</p>
+                       <code class="px-2 py-1 rounded-md bg-page dark:bg-chip font-mono text-[12px]">ABCD-1234</code>`,
+        "font-mono text-[12px] tabular-nums\npx-2 py-1 rounded-md bg-page dark:bg-chip font-mono text-[12px]");
+
+  // ── 규칙 요약 ───────────────────────────────────────────
+  const rules = `
+    <div class="rounded-2xl bg-white dark:bg-surface border border-line dark:border-edge ${S.purple} p-5">
+      <h2 class="text-sm font-extrabold ${L.purple}">새 화면 작성 규칙</h2>
+      <ul class="mt-2 grid gap-1.5 md:grid-cols-2 text-[12px] text-ink-2 dark:text-dim">
+        <li>- 카드 배경은 무채색. 색은 좌측 6px 띠와 라벨에만 사용</li>
+        <li>- 좌측 띠는 border-l-[6px] border-l-XXX-dot dark:border-l-XXX-dot 형태로 고정</li>
+        <li>- dark 변형을 빼면 dark:border-edge 가 좌측 색을 덮어씀</li>
+        <li>- 색은 blue / orange / green / red / purple 5색만 사용</li>
+        <li>- 라이트 배경 page, 다크 배경 canvas + 카드 surface</li>
+        <li>- 문구는 개조식(명사형 종결). 서술식 종결 금지</li>
+        <li>- 클래스는 theme.js 의 window.UI 문자열을 그대로 사용</li>
+        <li>- 새 색이나 새 반경 값은 추가하지 말 것</li>
+      </ul>
+    </div>`;
+
+  // ── 조립 ────────────────────────────────────────────────
+  const SECTIONS = [
+    ["color",  "01", "색 팔레트",      "액센트 5색 - dot 은 원색, text 는 흰 배경용", palette + `<div class="mt-4">${full("무채색 토큰", grayGrid)}</div>`],
+    ["button", "02", "버튼",           "primary 1종 + ghost + danger + 비활성",       buttons],
+    ["input",  "03", "입력 필드",      "기본 / 포커스 / 에러 / 도움말",               inputs],
+    ["card",   "04", "카드",           "무채색 카드 + 좌측 띠 5색",                   cards],
+    ["badge",  "05", "배지 · 태그",    "컬럼 배지 · 역할 태그 · 필터 칩",             badges],
+    ["notice", "06", "알림 박스",      "info / success / warning / error",            notices],
+    ["empty",  "07", "빈 상태",        "아이콘 + 안내 + 다음 행동",                   empties],
+    ["modal",  "08", "모달",           "카드 상세 모달 · 삭제 확인",                  modals],
+    ["load",   "09", "로딩 · 스켈레톤", "스피너 · 버튼 처리 중 · 스켈레톤",           loading],
+    ["type",   "10", "타이포 스케일",  "제목 / 본문 / 캡션 / 코드",                   typo]
+  ];
+
+  document.getElementById("main").innerHTML =
+    rules + SECTIONS.map(([id, no, t, sub, inner]) => section(id, no, t, sub, inner)).join("");
+
+  document.getElementById("nav").innerHTML = SECTIONS.map(([id, no, t]) => `
+    <a href="#${id}" class="shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-bold text-ink-2 dark:text-dim
+                            bg-page dark:bg-chip border border-line dark:border-edge hover:border-ink dark:hover:border-dim transition">
+      ${no} ${t}</a>`).join("");
+</script>
+</body>
+</html>

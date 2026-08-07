@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TaskFlow - 팀 선택</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="theme.js"></script>
+<script src="api.js"></script>
+</head>
+
+<body class="bg-page dark:bg-canvas text-ink dark:text-fg font-sans antialiased min-h-screen flex flex-col">
+
+<header class="sticky top-0 z-30 bg-white dark:bg-canvas border-b border-line dark:border-edge">
+  <div class="max-w-3xl mx-auto px-4 h-14 flex items-center gap-3">
+    <div class="flex items-center gap-2">
+      <div class="w-7 h-7 rounded-lg bg-ink dark:bg-fg grid place-items-center text-white dark:text-canvas font-extrabold text-sm">T</div>
+      <span class="font-extrabold tracking-tight">TaskFlow</span>
+    </div>
+    <div class="ml-auto flex items-center gap-2" id="themeSlot"></div>
+    <span class="hidden sm:block text-sm text-ink-2 dark:text-dim" id="meEmail"></span>
+    <button id="logoutBtn" class="text-sm font-bold text-ink-2 dark:text-dim hover:text-ink dark:hover:text-fg transition">로그아웃</button>
+  </div>
+</header>
+
+<main class="flex-1 w-full max-w-3xl mx-auto px-4 py-6 space-y-4">
+  <div id="notice"></div>
+  <div id="body"></div>
+</main>
+
+<script>
+  document.getElementById("themeSlot").innerHTML = window.THEME_BTN;
+  window.initTheme();
+  const $ = (id) => document.getElementById(id);
+  const S = window.STRIPE, L = window.LABEL;
+
+  let me = null;
+
+  document.getElementById("logoutBtn").onclick = async () => {
+    try { await window.api("/auth/logout", { method: "POST" }); } catch (e) {}
+    window.Auth.clear();
+    location.href = "/login.html";
+  };
+
+  // "새 팀 만들기" / "초대 코드로 합류" 두 폼을 함께 그린다.
+  // codeErr/nameErr가 있으면 해당 입력을 빨간 테두리로 표시하고 값을 유지한다 (재입력 편의).
+  function renderForms(codeErr = "", nameErr = "") {
+    $("body").innerHTML = `
+      <div class="grid gap-4 md:grid-cols-2">
+        <section class="rounded-2xl bg-white dark:bg-surface border border-line dark:border-edge ${S.green} p-5">
+          <h2 class="text-sm font-extrabold mb-1">새 팀 만들기</h2>
+          <p class="text-[12px] text-ink-2 dark:text-dim mb-4">만든 사람이 리더가 되고 초대 코드가 발급됨</p>
+          <label class="block text-xs font-bold mb-1.5">팀 이름</label>
+          <input id="teamName" maxlength="30" placeholder="1 ~ 30자"
+            class="w-full h-11 px-3.5 rounded-xl bg-page dark:bg-chip border ${nameErr ? "border-red-dot" : "border-line dark:border-edge"}
+                   text-sm placeholder:text-ink-3 dark:placeholder:text-dim focus:outline-none focus:border-green-dot transition">
+          ${nameErr ? `<p class="mt-1.5 text-[11px] font-semibold ${L.red}">${nameErr}</p>` : ""}
+          <button id="createBtn" class="w-full h-11 mt-3 rounded-xl bg-ink dark:bg-fg text-white dark:text-canvas text-sm font-bold transition">만들기</button>
+        </section>
+
+        <section class="rounded-2xl bg-white dark:bg-surface border border-line dark:border-edge ${S.orange} p-5">
+          <h2 class="text-sm font-extrabold mb-1">초대 코드로 합류</h2>
+          <p class="text-[12px] text-ink-2 dark:text-dim mb-4">리더에게 받은 코드를 입력</p>
+          <label class="block text-xs font-bold mb-1.5">초대 코드</label>
+          <input id="joinCode" maxlength="9" placeholder="ABCD-1234"
+            class="w-full h-11 px-3.5 rounded-xl bg-page dark:bg-chip border ${codeErr ? "border-red-dot" : "border-line dark:border-edge"}
+                   text-sm font-mono tracking-widest uppercase placeholder:text-ink-3 dark:placeholder:text-dim focus:outline-none focus:border-orange-dot transition">
+          ${codeErr
+            ? `<p class="mt-1.5 text-[11px] font-semibold ${L.red}">${codeErr}</p>`
+            : `<p class="mt-1.5 text-[11px] text-ink-3 dark:text-dim">형식 - 대문자 4 + 숫자 4 (하이픈 포함)</p>`}
+          <button id="joinBtn" class="w-full h-11 mt-3 rounded-xl bg-ink dark:bg-fg text-white dark:text-canvas text-sm font-bold transition">합류</button>
+        </section>
+      </div>`;
+
+    // 팀 이름 1~30자 클라이언트 검증 후 생성. 성공하면 초대코드 확인 화면(renderCreated)으로 전환.
+    $("createBtn").onclick = async () => {
+      const name = $("teamName").value.trim();
+      if (name.length < 1 || name.length > 30) {
+        $("notice").innerHTML = window.notice("red", "팀 이름 오류", "1~30자 이내로 입력");
+        renderForms("", "1~30자 이내로 입력");
+        return;
+      }
+      try {
+        const team = await window.api("/teams", { method: "POST", body: { name } });
+        $("notice").innerHTML = window.notice("green", "팀 생성 완료", "초대 코드를 팀원에게 전달");
+        renderCreated(team);
+      } catch (err) {
+        $("notice").innerHTML = window.notice("red", "팀 생성 실패", err.message);
+      }
+    };
+
+    // 초대코드 형식(대문자4+숫자4)을 먼저 클라이언트에서 걸러내고, 서버 응답 코드별로
+    // 다른 안내 문구를 보여준다 (없는 코드 / 이미 다른 팀 소속 등).
+    $("joinBtn").onclick = async () => {
+      const code = $("joinCode").value.trim().toUpperCase();
+      const codeRe = /^[A-Z]{4}-[0-9]{4}$/;
+      if (!codeRe.test(code)) {
+        renderForms("형식이 올바르지 않습니다 (예: ABCD-1234)");
+        return;
+      }
+      try {
+        await window.api("/teams/join", { method: "POST", body: { invite_code: code } });
+        location.href = "/kanban.html";
+      } catch (err) {
+        if (err.code === "NOT_FOUND") renderForms("해당 코드의 팀을 찾을 수 없습니다");
+        else if (err.status === 409) renderForms("이미 팀에 소속되어 있습니다");
+        else renderForms(err.message);
+      }
+    };
+  }
+
+  // 팀 생성 직후 초대코드를 크게 보여주는 화면. (이후에도 nav.js의 "팀 멤버" 패널에서 다시 볼 수 있음)
+  function renderCreated(team) {
+    $("body").innerHTML = `
+      <section class="rounded-2xl bg-white dark:bg-surface border border-line dark:border-edge ${S.green} p-5">
+        <h2 class="text-sm font-extrabold mb-1">${team.name} 팀</h2>
+        <p class="text-[12px] text-ink-2 dark:text-dim mb-4">생성자가 자동으로 owner. 초대 코드는 서버가 자동 생성</p>
+        <div class="flex items-center gap-2">
+          <code id="inviteCode" class="flex-1 h-11 px-3.5 grid place-items-center rounded-xl bg-page dark:bg-chip
+                       font-mono text-lg font-bold tracking-[.3em]">${team.invite_code}</code>
+          <button id="copyBtn" class="h-11 px-4 rounded-xl bg-white dark:bg-chip border border-line dark:border-edge text-sm font-bold">복사</button>
+        </div>
+        <button id="goKanban" class="w-full h-11 mt-3 rounded-xl bg-ink dark:bg-fg text-white dark:text-canvas text-sm font-bold">칸반으로 이동</button>
+      </section>`;
+    $("copyBtn").onclick = () => navigator.clipboard.writeText(team.invite_code);
+    $("goKanban").onclick = () => location.href = "/kanban.html";
+  }
+
+  // 진입 시: 로그인 안 됐으면 로그인 화면으로, 이미 팀이 있으면 칸반으로 바로 보낸다.
+  // 이 화면에 머무는 건 team_id가 NULL인 사용자뿐이다.
+  (async () => {
+    me = await window.routeGuard({ requireAuth: true });
+    if (!me) return;
+    if (me.team_id) {
+      location.href = "/kanban.html";
+      return;
+    }
+    $("meEmail").textContent = me.email;
+    $("notice").innerHTML = window.notice("blue", "아직 팀에 소속되지 않음", "팀을 만들거나 초대 코드로 합류해야 칸반을 사용할 수 있습니다");
+    renderForms();
+  })();
+</script>
+</body>
+</html>

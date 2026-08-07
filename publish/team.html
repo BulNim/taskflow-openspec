@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TaskFlow - 팀 선택</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="theme.js"></script>
+</head>
+
+<body class="bg-page dark:bg-canvas text-ink dark:text-fg font-sans antialiased min-h-screen flex flex-col">
+
+<header class="sticky top-0 z-30 bg-white dark:bg-canvas border-b border-line dark:border-edge">
+  <div class="max-w-3xl mx-auto px-4 h-14 flex items-center gap-3">
+    <div class="flex items-center gap-2">
+      <div class="w-7 h-7 rounded-lg bg-ink dark:bg-fg grid place-items-center text-white dark:text-canvas font-extrabold text-sm">T</div>
+      <span class="font-extrabold tracking-tight">TaskFlow</span>
+    </div>
+    <div class="ml-auto flex items-center gap-2" id="themeSlot"></div>
+    <span class="hidden sm:block text-sm text-ink-2 dark:text-dim">user@ex.com</span>
+    <button class="text-sm font-bold text-ink-2 dark:text-dim hover:text-ink dark:hover:text-fg transition">로그아웃</button>
+  </div>
+</header>
+
+<main class="flex-1 w-full max-w-3xl mx-auto px-4 py-6 space-y-4">
+  <div id="notice"></div>
+  <div id="body"></div>
+  <p id="note" class="text-center text-[11px] text-ink-3 dark:text-dim pt-1"></p>
+</main>
+
+<script>
+  document.getElementById("themeSlot").innerHTML = window.THEME_BTN;
+  window.initTheme();
+
+  const $ = (id) => document.getElementById(id);
+  const S = window.STRIPE, L = window.LABEL;
+
+  const myTeamEmpty = `
+    <section class="rounded-2xl bg-white dark:bg-surface border border-line dark:border-edge p-5">
+      <h2 class="text-sm font-extrabold mb-3">내 팀</h2>
+      <div class="grid place-items-center py-8 text-center rounded-xl bg-page dark:bg-chip">
+        <p class="text-[12px] font-semibold text-ink-3 dark:text-dim">소속된 팀 없음</p>
+      </div>
+    </section>`;
+
+  const forms = (codeVal = "", codeErr = "", nameErr = "") => `
+    <div class="grid gap-4 md:grid-cols-2">
+      <section class="rounded-2xl bg-white dark:bg-surface border border-line dark:border-edge ${S.green} p-5">
+        <h2 class="text-sm font-extrabold mb-1">새 팀 만들기</h2>
+        <p class="text-[12px] text-ink-2 dark:text-dim mb-4">만든 사람이 리더가 되고 초대 코드가 발급됨</p>
+        <label class="block text-xs font-bold mb-1.5">팀 이름</label>
+        <input maxlength="30" placeholder="1 ~ 30자"
+          class="w-full h-11 px-3.5 rounded-xl bg-page dark:bg-chip border ${nameErr ? "border-red-dot" : "border-line dark:border-edge"}
+                 text-sm placeholder:text-ink-3 dark:placeholder:text-dim focus:outline-none focus:border-green-dot transition">
+        ${nameErr ? `<p class="mt-1.5 text-[11px] font-semibold ${L.red}">${nameErr}</p>` : ""}
+        <button class="w-full h-11 mt-3 rounded-xl bg-ink dark:bg-fg text-white dark:text-canvas text-sm font-bold transition">만들기</button>
+      </section>
+
+      <section class="rounded-2xl bg-white dark:bg-surface border border-line dark:border-edge ${S.orange} p-5">
+        <h2 class="text-sm font-extrabold mb-1">초대 코드로 합류</h2>
+        <p class="text-[12px] text-ink-2 dark:text-dim mb-4">리더에게 받은 코드를 입력</p>
+        <label class="block text-xs font-bold mb-1.5">초대 코드</label>
+        <input maxlength="9" value="${codeVal}" placeholder="ABCD-1234"
+          class="w-full h-11 px-3.5 rounded-xl bg-page dark:bg-chip border ${codeErr ? "border-red-dot" : "border-line dark:border-edge"}
+                 text-sm font-mono tracking-widest uppercase placeholder:text-ink-3 dark:placeholder:text-dim focus:outline-none focus:border-orange-dot transition">
+        ${codeErr
+          ? `<p class="mt-1.5 text-[11px] font-semibold ${L.red}">${codeErr}</p>`
+          : `<p class="mt-1.5 text-[11px] text-ink-3 dark:text-dim">형식 - 대문자 4 + 숫자 4 (하이픈 포함)</p>`}
+        <button class="w-full h-11 mt-3 rounded-xl bg-ink dark:bg-fg text-white dark:text-canvas text-sm font-bold transition">합류</button>
+      </section>
+    </div>`;
+
+  const members = `
+    <section class="rounded-2xl bg-white dark:bg-surface border border-line dark:border-edge p-5">
+      <div class="flex items-center gap-2 mb-3">
+        <h2 class="text-sm font-extrabold">팀 멤버</h2>
+        <span class="text-xs font-bold text-ink-3 dark:text-dim">3</span>
+      </div>
+      <div class="space-y-2">
+        ${[["leader@ex.com","리더","owner",true],
+           ["user@ex.com","나","member",false],
+           ["new@ex.com","신규","member",false]].map(([em, nm, role, own]) => `
+          <div class="flex items-center gap-3 rounded-xl bg-white dark:bg-surface border border-line dark:border-edge ${own ? S.purple : S.blue} px-3.5 py-2.5">
+            <div class="w-7 h-7 rounded-full ${own ? "bg-purple-dot" : "bg-blue-dot"} shrink-0"></div>
+            <div class="min-w-0">
+              <p class="text-[13px] font-bold truncate">${nm}</p>
+              <p class="text-[11px] text-ink-3 dark:text-dim truncate">${em}</p>
+            </div>
+            <span class="ml-auto shrink-0 px-2 py-0.5 rounded-md text-[10px] font-extrabold
+                         ${own ? "bg-purple-dot text-white" : "bg-page dark:bg-chip text-ink-2 dark:text-dim"}">${role}</span>
+          </div>`).join("")}
+      </div>
+      <p class="mt-3 text-[11px] text-ink-3 dark:text-dim">owner 와 member 구분만. 추방과 역할 변경은 범위 외</p>
+    </section>`;
+
+  const STATES = {
+    "none": () => {
+      $("notice").innerHTML = window.notice("blue", "아직 팀에 소속되지 않음", "팀을 만들거나 초대 코드로 합류해야 칸반 사용 가능");
+      $("body").innerHTML = myTeamEmpty + forms();
+      $("note").textContent = "팀 가입 전에는 칸반 접근 불가. 뒤로 가기로 로그인 화면으로 돌아가지 않음";
+    },
+    "created": () => {
+      $("notice").innerHTML = window.notice("green", "팀 생성 완료", "초대 코드를 팀원에게 전달");
+      $("body").innerHTML = `
+        <section class="rounded-2xl bg-white dark:bg-surface border border-line dark:border-edge ${window.STRIPE.green} p-5">
+          <h2 class="text-sm font-extrabold mb-1">Frontiers 팀</h2>
+          <p class="text-[12px] text-ink-2 dark:text-dim mb-4">생성자가 자동으로 owner. 초대 코드는 서버가 자동 생성</p>
+          <div class="flex items-center gap-2">
+            <code class="flex-1 h-11 px-3.5 grid place-items-center rounded-xl bg-page dark:bg-chip
+                         font-mono text-lg font-bold tracking-[.3em]">ABCD-1234</code>
+            <button class="h-11 px-4 rounded-xl bg-white dark:bg-chip border border-line dark:border-edge text-sm font-bold">복사</button>
+          </div>
+          <button class="w-full h-11 mt-3 rounded-xl bg-ink dark:bg-fg text-white dark:text-canvas text-sm font-bold">칸반으로 이동</button>
+        </section>` + members;
+      $("note").textContent = "POST /api/teams > 201 + invite_code";
+    },
+    "joined": () => {
+      $("notice").innerHTML = window.notice("green", "합류 완료", "users.team_id 갱신 후 칸반으로 이동");
+      $("body").innerHTML = members;
+      $("note").textContent = "POST /api/teams/join > 200 > redirect /teams/{id}";
+    },
+    "err-format": () => {
+      $("notice").innerHTML = window.notice("red", "초대 코드 형식 오류", "대문자 4 + 숫자 4, 하이픈 포함");
+      $("body").innerHTML = myTeamEmpty + forms("abc-12", "형식이 올바르지 않음 (예 ABCD-1234)");
+      $("note").textContent = "400 INVITE_CODE_INVALID - 클라이언트에서 먼저 차단";
+    },
+    "err-notfound": () => {
+      $("notice").innerHTML = window.notice("red", "존재하지 않는 초대 코드", "리더에게 코드를 다시 확인");
+      $("body").innerHTML = myTeamEmpty + forms("ZZZZ-9999", "해당 코드의 팀이 없음");
+      $("note").textContent = "404 TEAM_NOT_FOUND";
+    },
+    "err-already": () => {
+      $("notice").innerHTML = window.notice("orange", "이미 소속된 팀이 있음", "한 사용자는 한 팀에만 소속 가능");
+      $("body").innerHTML = myTeamEmpty + forms("ABCD-1234", "이미 팀에 소속됨");
+      $("note").textContent = "409 ALREADY_IN_TEAM";
+    },
+    "err-name": () => {
+      $("notice").innerHTML = window.notice("red", "팀 이름 오류", "1 ~ 30자 이내로 입력");
+      $("body").innerHTML = myTeamEmpty + forms("", "", "팀 이름은 1 ~ 30자");
+      $("note").textContent = "400 TEAM_NAME_INVALID";
+    },
+    "members": () => {
+      $("notice").innerHTML = "";
+      $("body").innerHTML = members;
+      $("note").textContent = "사이드 패널로도 열림. owner 는 별도 표시";
+    }
+  };
+
+  window.stateBar([
+    {key:"none",        label:"팀 미가입"},
+    {key:"created",     label:"팀 생성 완료"},
+    {key:"joined",      label:"합류 완료"},
+    {key:"members",     label:"멤버 목록"},
+    {key:"err-format",  label:"에러 - 형식"},
+    {key:"err-notfound",label:"에러 - 없는 코드"},
+    {key:"err-already", label:"에러 - 이미 소속"},
+    {key:"err-name",    label:"에러 - 팀 이름"}
+  ], (key) => STATES[key]());
+</script>
+</body>
+</html>

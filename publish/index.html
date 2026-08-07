@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TaskFlow - 퍼블리싱 파일</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="theme.js"></script>
+</head>
+
+<body class="bg-page dark:bg-canvas text-ink dark:text-fg font-sans antialiased min-h-screen flex flex-col">
+
+<header class="sticky top-0 z-30 bg-white dark:bg-canvas border-b border-line dark:border-edge">
+  <div class="max-w-5xl mx-auto px-4 h-14 flex items-center gap-3">
+    <div class="flex items-center gap-2 shrink-0">
+      <div class="w-7 h-7 rounded-lg bg-ink dark:bg-fg grid place-items-center text-white dark:text-canvas font-extrabold text-sm">T</div>
+      <span class="font-extrabold tracking-tight">TaskFlow</span>
+      <span class="text-ink-3 dark:text-dim px-1">/</span>
+    </div>
+    <span class="text-sm font-bold">퍼블리싱 파일</span>
+    <div class="ml-auto flex items-center gap-2" id="themeSlot"></div>
+  </div>
+</header>
+
+<main class="flex-1 w-full max-w-5xl mx-auto px-4 py-5 space-y-4">
+
+  <!-- 01. 개요 -->
+  <section class="rounded-2xl bg-white dark:bg-surface border border-line dark:border-edge
+                  border-l-[6px] border-l-purple-dot dark:border-l-purple-dot p-5">
+    <h1 class="text-lg font-extrabold tracking-tight">TaskFlow 퍼블리싱 파일</h1>
+    <p class="mt-1.5 text-[13px] text-ink-2 dark:text-dim">
+      확정된 디자인 구현체. 이 클래스 규칙을 그대로 따를 것
+    </p>
+  </section>
+
+  <!-- 02. 파일 목록 -->
+  <section class="rounded-2xl bg-white dark:bg-surface border border-line dark:border-edge p-5">
+    <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1 mb-3">
+      <span class="font-mono text-[11px] font-bold text-ink-3 dark:text-dim">01</span>
+      <h2 class="text-sm font-extrabold">파일</h2>
+      <p class="text-[11px] text-ink-3 dark:text-dim">5개 - 스타일 가이드 1 + 화면 4</p>
+    </div>
+    <div id="files" class="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3"></div>
+  </section>
+
+  <!-- 03. 사용법 -->
+  <section class="rounded-2xl bg-white dark:bg-surface border border-line dark:border-edge p-5">
+    <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1 mb-3">
+      <span class="font-mono text-[11px] font-bold text-ink-3 dark:text-dim">02</span>
+      <h2 class="text-sm font-extrabold">사용법</h2>
+      <p class="text-[11px] text-ink-3 dark:text-dim">상태 전환과 테마 전환</p>
+    </div>
+    <ul class="grid gap-1.5 text-[12px] text-ink-2 dark:text-dim">
+      <li>- 각 화면 상단 보라색 STATE 바에서 상태를 눌러 전환</li>
+      <li>- 우상단 아이콘으로 라이트 / 다크 전환</li>
+      <li>- 실제 구현 시 STATE 바는 제거</li>
+    </ul>
+  </section>
+
+  <!-- 04. 디자인 토큰 -->
+  <section class="rounded-2xl bg-white dark:bg-surface border border-line dark:border-edge p-5">
+    <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1 mb-3">
+      <span class="font-mono text-[11px] font-bold text-ink-3 dark:text-dim">03</span>
+      <h2 class="text-sm font-extrabold">디자인 토큰</h2>
+      <p class="text-[11px] text-ink-3 dark:text-dim">액센트 5색 - dot 은 원색, text 는 흰 배경용</p>
+    </div>
+    <div id="tokens" class="grid gap-2 sm:grid-cols-2"></div>
+    <p class="mt-3 text-[11px] text-ink-3 dark:text-dim">
+      - 카드 배경은 무채색. 색은 좌측 6px 띠와 라벨에만 사용<br>
+      - dark:border-l-XXX-dot 를 빼면 dark:border-edge 가 좌측 색을 덮어씀<br>
+      - 무채색 토큰 11종은 components.html 01 색 팔레트에서 확인
+    </p>
+  </section>
+
+  <!-- 05. AI 전달 문구 -->
+  <section class="rounded-2xl bg-white dark:bg-surface border border-line dark:border-edge
+                  border-l-[6px] border-l-blue-dot dark:border-l-blue-dot p-5">
+    <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1 mb-3">
+      <span class="font-mono text-[11px] font-bold text-ink-3 dark:text-dim">04</span>
+      <h2 class="text-sm font-extrabold">AI 에게 전달할 문구</h2>
+      <p class="text-[11px] text-ink-3 dark:text-dim">복사해서 그대로 붙여넣기</p>
+      <button id="copyBtn"
+        class="ml-auto h-9 px-3 rounded-lg bg-white dark:bg-chip border border-line dark:border-edge
+               text-[12px] font-bold hover:border-ink dark:hover:border-dim transition">복사</button>
+    </div>
+    <pre class="overflow-x-auto rounded-xl bg-page dark:bg-chip border border-line dark:border-edge px-3.5 py-3"><code id="aiText"
+      class="block text-[12px] leading-relaxed font-mono text-ink-2 dark:text-dim whitespace-pre-wrap break-all">publish 폴더의 HTML 이 확정된 디자인이다. theme.js 의 색 토큰과 클래스 규칙을
+그대로 따르고 임의로 바꾸지 말 것. 새 화면은 components.html 의 컴포넌트를 조합해 만들 것.</code></pre>
+  </section>
+
+</main>
+
+<footer class="max-w-5xl mx-auto w-full px-4 pb-8 pt-2">
+  <p class="text-center text-[11px] text-ink-3 dark:text-dim">
+    theme.js 의 window.UI / STRIPE / LABEL 토큰 기준. 새 화면은 이 문자열을 그대로 복사해서 사용
+  </p>
+</footer>
+
+<script>
+  document.getElementById("themeSlot").innerHTML = window.THEME_BTN;
+  window.initTheme();
+
+  const S = window.STRIPE, L = window.LABEL;
+  const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  // ── 파일 카드 ───────────────────────────────────────────
+  // [파일명, 화면 이름, 설명, 개수 배지, 색]
+  const FILES = [
+    ["components.html", "스타일 가이드",   "색 팔레트와 클래스 규칙. 먼저 볼 것", "섹션 10", "purple"],
+    ["login.html",      "로그인 / 회원가입", "가입 · 로그인 · 세션 만료",          "상태 10", "blue"],
+    ["team.html",       "팀 선택",         "팀 생성 · 초대 코드 합류 · 멤버",     "상태 8",  "orange"],
+    ["kanban.html",     "칸반",            "3열 보드 · 카드 모달 · 모바일 시트",   "상태 10", "green"],
+    ["chat.html",       "채팅",            "팀 대화 · 폴링 · 메시지 삭제",        "상태 9",  "blue"]
+  ];
+
+  document.getElementById("files").innerHTML = FILES.map(([file, name, desc, cnt, c]) => `
+    <a href="${file}" class="block rounded-xl bg-white dark:bg-surface border border-line dark:border-edge ${S[c]}
+              px-3.5 py-3 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-150">
+      <div class="flex items-center gap-2">
+        <span class="font-mono text-[12.5px] font-extrabold ${L[c]} truncate">${file}</span>
+        <span class="ml-auto shrink-0 px-2 py-0.5 rounded-md text-[10px] font-extrabold
+                     bg-page dark:bg-chip text-ink-2 dark:text-dim">${cnt}</span>
+      </div>
+      <p class="mt-1.5 text-[13px] font-bold leading-snug">${name}</p>
+      <p class="mt-0.5 text-[11px] text-ink-3 dark:text-dim">${desc}</p>
+    </a>`).join("");
+
+  // ── 디자인 토큰 ─────────────────────────────────────────
+  const COLORS = [
+    ["blue",   "#4CA0E5", "#1565B0", "TODO · 정보 · 링크"],
+    ["orange", "#EF8B22", "#A65A00", "DOING · 주의 · 대기"],
+    ["green",  "#00A65A", "#007A42", "DONE · 성공 · 온라인"],
+    ["red",    "#E1232B", "#C21620", "에러 · 삭제 · 연결 끊김"],
+    ["purple", "#7C40A2", "#6B3590", "owner · 선택 · 강조"]
+  ];
+
+  document.getElementById("tokens").innerHTML = COLORS.map(([c, dot, text, use]) => `
+    <div class="rounded-xl bg-white dark:bg-surface border border-line dark:border-edge ${S[c]} px-3.5 py-3">
+      <div class="flex items-center gap-2.5">
+        <span class="w-7 h-7 rounded-lg bg-${c}-dot shrink-0"></span>
+        <div class="min-w-0">
+          <p class="text-[13px] font-extrabold ${L[c]}">${c}</p>
+          <p class="text-[11px] text-ink-3 dark:text-dim truncate">${use}</p>
+        </div>
+      </div>
+      <div class="mt-2 space-y-1 font-mono text-[10.5px] text-ink-2 dark:text-dim break-all">
+        <p><span class="font-bold text-ink dark:text-fg">dot</span>&nbsp; ${dot} &nbsp;bg-${c}-dot</p>
+        <p><span class="font-bold text-ink dark:text-fg">text</span> ${text} &nbsp;text-${c}-text</p>
+        <p>${esc(S[c])}</p>
+      </div>
+    </div>`).join("");
+
+  // ── 복사 ────────────────────────────────────────────────
+  const copyBtn = document.getElementById("copyBtn");
+  copyBtn.onclick = async () => {
+    const t = document.getElementById("aiText").textContent;
+    try { await navigator.clipboard.writeText(t); }
+    catch (e) {
+      const ta = document.createElement("textarea");
+      ta.value = t; document.body.appendChild(ta); ta.select();
+      document.execCommand("copy"); ta.remove();
+    }
+    copyBtn.textContent = "복사 완료";
+    setTimeout(() => { copyBtn.textContent = "복사"; }, 1500);
+  };
+</script>
+</body>
+</html>

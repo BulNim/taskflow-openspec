@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TaskFlow</title>
+<script src="api.js"></script>
+</head>
+<body>
+<script>
+  // 진입 라우터 전용 페이지 - 화면을 그리지 않고 로그인/팀 소속 상태에 따라
+  // 로그인, 팀 선택, 칸반 중 알맞은 화면으로 즉시 리다이렉트한다.
+  (async () => {
+    if (!window.Auth.getToken()) {
+      location.href = "/login.html";
+      return;
+    }
+    try {
+      const me = await window.api("/auth/me");
+      location.href = me.team_id ? "/kanban.html" : "/team.html";
+    } catch (e) {
+      // /auth/me 실패(토큰 만료 등) - api.js가 이미 토큰을 지웠으므로 로그인으로.
+      location.href = "/login.html";
+    }
+  })();
+</script>
+</body>
+</html>

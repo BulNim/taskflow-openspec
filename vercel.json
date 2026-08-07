@@ -1,0 +1,14 @@
+{
+  "builds": [
+    { "src": "backend/app/main.py", "use": "@vercel/python" },
+    { "src": "frontend/**", "use": "@vercel/static" }
+  ],
+  "routes": [
+    { "src": "/auth/(.*)", "dest": "backend/app/main.py" },
+    { "src": "/teams(.*)", "dest": "backend/app/main.py" },
+    { "src": "/tasks(.*)", "dest": "backend/app/main.py" },
+    { "src": "/messages(.*)", "dest": "backend/app/main.py" },
+    { "src": "/health", "dest": "backend/app/main.py" },
+    { "src": "/(.*)", "dest": "frontend/$1" }
+  ]
+}

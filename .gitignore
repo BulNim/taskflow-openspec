@@ -1,5 +1,14 @@
 # Dependencies
 node_modules/
+backend/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Local DB / test artifacts
+*.db
+.playwright-mcp/
+.tmp/
 
 # Build outputs
 dist/

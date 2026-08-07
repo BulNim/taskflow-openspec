@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TaskFlow - 채팅</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="theme.js"></script>
+<style>
+  /* 모바일 풀스크린 - 키보드가 올라와도 입력창이 가려지지 않게 */
+  .app-h { height: 100dvh; }
+  .no-bar { -ms-overflow-style: none; scrollbar-width: none; }
+  .no-bar::-webkit-scrollbar { display: none; }
+  /* 모바일 상태 - 데스크탑 창에서 폰 폭을 흉내 */
+  .mob .dt-only { display: none !important; }
+  .mob .mb-only { display: grid !important; }
+</style>
+</head>
+
+<body class="bg-page dark:bg-canvas text-ink dark:text-fg font-sans antialiased app-h flex flex-col overflow-hidden">
+
+<div id="app" class="flex-1 min-h-0 w-full flex flex-col bg-page dark:bg-canvas">
+
+  <!-- ===== 상단 바 ===== -->
+  <header class="shrink-0 bg-white dark:bg-canvas border-b border-line dark:border-edge">
+    <div class="max-w-3xl mx-auto px-4 h-14 flex items-center gap-3">
+
+      <button class="mb-only md:hidden w-8 h-8 -ml-1 grid place-items-center rounded-lg hover:bg-page dark:hover:bg-edge" aria-label="뒤로">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+
+      <div class="dt-only hidden md:flex items-center gap-2">
+        <div class="w-7 h-7 rounded-lg bg-ink dark:bg-fg grid place-items-center text-white dark:text-canvas font-extrabold text-sm">T</div>
+        <span class="font-extrabold tracking-tight">TaskFlow</span>
+        <span class="text-ink-3 dark:text-dim px-1">/</span>
+      </div>
+
+      <span class="text-sm font-bold">Frontiers<span class="hidden sm:inline"> 팀</span> · 채팅</span>
+
+      <div class="ml-auto flex items-center gap-2">
+        <!-- 폴링 표시 - 5초마다 새로고침 -->
+        <span id="poll"></span>
+        <span id="themeSlot"></span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===== 폴링 실패 배너 ===== -->
+  <div id="banner" class="shrink-0"></div>
+
+  <!-- ===== 메시지 목록 ===== -->
+  <div class="relative flex-1 min-h-0 flex flex-col">
+    <main id="list" class="flex-1 overflow-y-auto no-bar">
+      <div class="max-w-3xl mx-auto px-4 py-4 space-y-3" id="msgs"></div>
+    </main>
+
+    <!-- 새 메시지 도착 배지 -->
+    <div id="newBadge" class="hidden absolute inset-x-0 bottom-3 flex justify-center">
+      <button class="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-ink dark:bg-fg text-white dark:text-canvas
+                     text-[12px] font-bold shadow-lg active:scale-[.98] transition">
+        새 메시지 2건
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== 입력창 ===== -->
+  <footer class="shrink-0 bg-white dark:bg-canvas border-t border-line dark:border-edge">
+    <div class="max-w-3xl mx-auto px-4 py-3">
+      <div class="flex items-end gap-2">
+        <textarea id="input" rows="1" placeholder="메시지 입력 (1000자 이내)..."
+          class="flex-1 max-h-28 no-bar px-3.5 py-2.5 rounded-xl bg-page dark:bg-chip border border-line dark:border-edge
+                 text-sm resize-none placeholder:text-ink-3 dark:placeholder:text-dim
+                 focus:outline-none focus:border-blue-dot focus:ring-2 focus:ring-blue-dot/25 transition"></textarea>
+        <button id="send"
+          class="h-11 px-4 shrink-0 rounded-xl bg-ink dark:bg-fg text-white dark:text-canvas text-sm font-bold
+                 hover:opacity-90 active:scale-[.99] disabled:opacity-50 transition">전송</button>
+      </div>
+
+      <div class="mt-1.5 flex items-center gap-3 min-h-[15px]">
+        <p id="inputErr" class="hidden text-[11px] font-semibold text-red-text dark:text-red-dot"></p>
+        <span id="counter" class="hidden ml-auto text-[11px] font-semibold tabular-nums text-ink-3 dark:text-dim"></span>
+      </div>
+
+      <p id="note" class="mt-1 text-center text-[11px] text-ink-3 dark:text-dim"></p>
+    </div>
+  </footer>
+
+  <!-- ===== 가상 키보드 (모바일 상태) ===== -->
+  <div id="keyboard" class="hidden shrink-0 bg-page dark:bg-chip border-t border-line dark:border-edge px-1.5 pt-2 pb-3 space-y-1.5"></div>
+</div>
+
+<!-- ===== 롱프레스 삭제 시트 ===== -->
+<div id="sheet" class="hidden fixed inset-0 z-50">
+  <div class="absolute inset-0 bg-black/40" data-close></div>
+  <div class="absolute inset-x-0 bottom-0 rounded-t-2xl bg-white dark:bg-surface p-4 pb-7">
+    <div class="w-9 h-1 rounded-full bg-line dark:bg-edge mx-auto mb-4"></div>
+    <div id="sheetBody"></div>
+  </div>
+</div>
+
+<script>
+  document.getElementById("themeSlot").innerHTML = window.THEME_BTN;
+  window.initTheme();
+
+  const S = window.STRIPE, L = window.LABEL;
+  const $ = (id) => document.getElementById(id);
+  const ME = "user@ex.com";
+
+  const app = $("app"), list = $("list"), msgs = $("msgs");
+  const input = $("input"), send = $("send"), counter = $("counter"), inputErr = $("inputErr");
+
+  // 실제 연동 시 GET /api/teams/{id}/messages 응답으로 교체
+  // 이후 5초마다 ?since={마지막 created_at} 으로 새 메시지만 가져옴
+  const BASE = [
+    { id:21, email:"leader@ex.com", name:"리더",   text:"오늘 DOING 컬럼 비워둘 수 있을까요?", at:"14:25" },
+    { id:22, email:ME,              name:"나",     text:"JWT 미들웨어만 끝내고 옮길게요",      at:"14:27" },
+    { id:23, email:"new@ex.com",    name:"신규",   text:"초대 코드는 어디 입력하나요?",        at:"14:30" }
+  ];
+  // 폴링으로 뒤늦게 도착한 메시지 2건
+  const INCOMING = [
+    { id:24, email:"design@ex.com", name:"디자인", text:"카드 여백 줄인 시안 링크 공유",       at:"14:33" },
+    { id:25, email:"leader@ex.com", name:"리더",   text:"지금 확인해볼게요",                   at:"14:34" }
+  ];
+  const LONG = "어제 미팅에서 논의한 칸반 컬럼 분리 안을 정리해서 공유. 우선 TODO / DOING / DONE 3컬럼은 " +
+               "그대로 두되 각 컬럼 안에서 우선순위 라벨을 추가하는 방향. 다만 이번 범위에 포함되지 않으므로 " +
+               "다음 스프린트로 미루는 편이 안전";
+
+  // 발신자별 색 - 등장 순서대로 팔레트 배정. 내 메시지는 무채색
+  const PALETTE = ["blue","orange","green"];
+  const colorOf = (data) => {
+    const map = new Map();
+    data.forEach(m => {
+      if (m.email === ME || map.has(m.email)) return;
+      map.set(m.email, PALETTE[map.size % PALETTE.length]);
+    });
+    return map;
+  };
+
+  const trashBtn = `
+    <button class="w-7 h-7 grid place-items-center rounded-lg text-ink-3 dark:text-dim
+                   hover:bg-page dark:hover:bg-edge hover:text-red-text dark:hover:text-red-dot transition" aria-label="메시지 삭제">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg>
+    </button>`;
+
+  const render = (m, opts, cmap) => {
+    const sel = opts.sel === m.id;
+    const ring = sel ? " ring-2 ring-purple-dot ring-offset-2 ring-offset-page dark:ring-offset-canvas" : "";
+    if (m.email === ME) {
+      // 내 메시지 - 오른쪽, 무채색 채움
+      return `
+        <div class="flex justify-end">
+          <div class="max-w-[78%]">
+            <div class="flex items-center justify-end gap-2 mb-1 text-[11px] font-semibold text-ink-3 dark:text-dim">
+              <span>${m.at}</span><span class="font-bold text-ink dark:text-fg">${m.name}</span>
+            </div>
+            <div class="flex items-center justify-end gap-1">
+              ${opts.trash ? trashBtn : ""}
+              <div class="rounded-xl rounded-tr-sm bg-ink dark:bg-fg text-white dark:text-canvas px-3.5 py-2.5 text-[14px] leading-snug${ring}">
+                ${m.text}
+              </div>
+            </div>
+          </div>
+        </div>`;
+    }
+    // 상대 메시지 - 왼쪽, 좌측 6px 띠 (시안 A 규칙)
+    const c = cmap.get(m.email);
+    return `
+      <div class="flex justify-start">
+        <div class="max-w-[78%]">
+          <div class="flex items-center gap-2 mb-1 text-[11px] font-semibold">
+            <span class="font-bold text-${c}-text dark:text-${c}-dot">${m.name}</span>
+            <span class="text-ink-3 dark:text-dim">${m.at}</span>
+          </div>
+          <div class="rounded-xl rounded-tl-sm bg-white dark:bg-surface border border-line dark:border-edge
+                      border-l-[6px] border-l-${c}-dot dark:border-l-${c}-dot px-3.5 py-2.5 text-[14px] leading-snug${ring}">
+            ${m.text}
+          </div>
+        </div>
+      </div>`;
+  };
+
+  const emptyState = `
+    <div class="grid place-items-center text-center py-16">
+      <div class="w-14 h-14 rounded-2xl bg-white dark:bg-surface border border-line dark:border-edge
+                  ${S.blue} grid place-items-center text-blue-text dark:text-blue-dot">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H8l-4 4V5a2 2 0 012-2h13a2 2 0 012 2z"/></svg>
+      </div>
+      <p class="mt-4 text-sm font-extrabold">아직 대화 없음</p>
+      <p class="mt-1 text-[12px] text-ink-2 dark:text-dim">첫 메시지 작성으로 팀 대화 시작</p>
+      <button class="mt-4 h-11 px-4 rounded-xl bg-ink dark:bg-fg text-white dark:text-canvas text-sm font-bold">첫 메시지 작성</button>
+    </div>`;
+
+  const draw = (data, opts = {}) => {
+    if (!data.length) { msgs.innerHTML = emptyState; return; }
+    const cmap = colorOf(data);
+    msgs.innerHTML = data.map(m => render(m, opts, cmap)).join("");
+    list.scrollTop = opts.top ? 0 : list.scrollHeight;
+  };
+
+  const setPoll = (ok) => {
+    $("poll").innerHTML = ok
+      ? `<span class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-page dark:bg-chip text-[11px] font-bold text-ink-2 dark:text-dim">
+           <span class="w-1.5 h-1.5 rounded-full bg-green-dot animate-pulse"></span>
+           <span class="hidden sm:inline">5초마다 새로고침</span>
+         </span>`
+      : `<span class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white dark:bg-chip border border-red-dot text-[11px] font-bold ${L.red}">
+           <span class="w-1.5 h-1.5 rounded-full bg-red-dot animate-pulse"></span>
+           <span class="hidden sm:inline">연결 끊김</span>
+         </span>`;
+  };
+
+  // 가상 키보드 - 모바일 상태에서 메시지 영역이 줄어드는 모습 확인용
+  const KEY = "px-0 h-9 flex-1 rounded-md bg-white dark:bg-surface border border-line dark:border-edge " +
+              "grid place-items-center text-[12px] font-bold text-ink-2 dark:text-dim";
+  $("keyboard").innerHTML =
+    ["QWERTYUIOP","ASDFGHJKL","ZXCVBNM"].map(r =>
+      `<div class="flex gap-1 justify-center">${[...r].map(k => `<span class="${KEY}">${k}</span>`).join("")}</div>`
+    ).join("") +
+    `<div class="flex gap-1 justify-center"><span class="${KEY} flex-[6]">space</span><span class="${KEY} flex-[2]">전송</span></div>`;
+
+  const hideSheet = () => $("sheet").classList.add("hidden");
+  document.addEventListener("click", (e) => { if (e.target.closest("[data-close]")) hideSheet(); });
+
+  const openSheet = (html) => { $("sheetBody").innerHTML = html; $("sheet").classList.remove("hidden"); };
+
+  // 입력창 높이 자동 조절 + 글자 수 카운터
+  const LIMIT = 1000;
+  const sizeInput = () => {
+    input.style.height = "auto";
+    input.style.height = Math.min(input.scrollHeight, 112) + "px";
+  };
+  input.addEventListener("input", () => { sizeInput(); count(input.value.length); });
+  const count = (n) => {
+    const over = n > LIMIT;
+    counter.classList.remove("hidden");
+    counter.className = "ml-auto text-[11px] font-semibold tabular-nums " +
+      (over ? L.red : "text-ink-3 dark:text-dim");
+    counter.textContent = n.toLocaleString() + " / " + LIMIT.toLocaleString();
+    input.classList.toggle("border-red-dot", over);
+    send.disabled = over;
+    inputErr.classList.toggle("hidden", !over);
+    if (over) inputErr.textContent = (n - LIMIT) + "자 초과. 메시지는 1000자 이내";
+  };
+
+  // ── 상태 정의 (스토리보드 E-01 ~ E-04, F-02) ──────────────
+  const base = () => {
+    hideSheet();
+    app.className = "flex-1 min-h-0 w-full flex flex-col bg-page dark:bg-canvas";
+    $("keyboard").classList.add("hidden");
+    $("banner").innerHTML = "";
+    $("newBadge").classList.add("hidden");
+    setPoll(true);
+    input.value = "";
+    input.disabled = false;
+    input.placeholder = "메시지 입력 (1000자 이내)...";
+    input.classList.remove("border-red-dot");
+    sizeInput();
+    send.disabled = false;
+    counter.classList.add("hidden");
+    inputErr.classList.add("hidden");
+    draw(BASE);
+  };
+
+  const STATES = {
+    "normal": () => {
+      base();
+      $("note").textContent = "GET /api/teams/{id}/messages?since= 5초 폴링. 응답이 빈 배열이면 화면 변화 없음";
+    },
+    "empty": () => {
+      base();
+      draw([]);
+      input.placeholder = "첫 메시지 입력...";
+      $("note").textContent = "messages 0건. 1건 전송 즉시 일반 채팅 화면으로 전환";
+    },
+    "typing": () => {
+      base();
+      input.value = "DOING 카드 오늘 안에 정리 가능할까요?";
+      sizeInput();
+      count(input.value.length);
+      $("note").textContent = "입력 시마다 length 체크. 1000자 이내면 카운터 무채색";
+    },
+    "over": () => {
+      base();
+      input.value = LONG;
+      sizeInput();
+      counter.classList.remove("hidden");
+      counter.className = "ml-auto text-[11px] font-semibold tabular-nums " + L.red;
+      counter.textContent = "1,042 / 1,000";
+      input.classList.add("border-red-dot");
+      inputErr.textContent = "42자 초과. 메시지는 1000자 이내";
+      inputErr.classList.remove("hidden");
+      send.disabled = true;
+      $("note").textContent = "클라이언트 차단 + 서버 재검증. 400 TOO_LONG { limit:1000, actual:1042 }";
+    },
+    "poll-fail": () => {
+      base();
+      setPoll(false);
+      $("banner").innerHTML = `
+        <div class="max-w-3xl mx-auto px-4 pt-3">
+          <div class="rounded-xl bg-white dark:bg-surface border border-line dark:border-edge ${S.red} px-4 py-3 flex items-center gap-3">
+            <div>
+              <p class="text-[13px] font-bold ${L.red}">연결 끊김 · 5초 뒤 재시도</p>
+              <p class="text-[12px] text-ink-2 dark:text-dim mt-0.5">재시도 3회 · 간격 5s > 10s > 20s > 40s > 60s 고정</p>
+            </div>
+            <button class="ml-auto shrink-0 h-9 px-3 rounded-lg bg-white dark:bg-chip border border-line dark:border-edge text-[12px] font-bold">지금 재시도</button>
+          </div>
+        </div>`;
+      input.placeholder = "오프라인 - 연결 복구 후 전송";
+      $("note").textContent = "복구 시 since= 파라미터로 누락분 일괄 수신. 메시지 누락 0건 보장";
+    },
+    "poll-new": () => {
+      base();
+      draw(BASE.concat(INCOMING), { top:true });
+      $("newBadge").classList.remove("hidden");
+      $("note").textContent = "스크롤이 하단이 아닐 때만 배지 노출. 클릭 시 최신 메시지로 이동";
+    },
+    "delete-own": () => {
+      base();
+      draw(BASE, { sel:22, trash:true });
+      openSheet(`
+        <p class="text-sm font-bold px-1">내 메시지</p>
+        <p class="text-[12px] text-ink-2 dark:text-dim mt-0.5 mb-3 px-1">14:27 · JWT 미들웨어만 끝내고 옮길게요</p>
+        <button class="w-full text-left px-4 py-3 rounded-xl bg-page dark:bg-chip ${S.red} text-sm font-bold ${L.red}">메시지 삭제</button>
+        <button data-close class="w-full mt-2 px-4 py-3 rounded-xl text-sm font-bold text-ink-2 dark:text-dim">취소</button>`);
+      $("note").textContent = "데스크탑은 호버 시 휴지통, 모바일은 길게 누르기. DELETE /api/messages/{id}";
+    },
+    "delete-deny": () => {
+      base();
+      draw(BASE, { sel:21 });
+      openSheet(`
+        <p class="text-sm font-bold px-1">리더 메시지</p>
+        <p class="text-[12px] text-ink-2 dark:text-dim mt-0.5 mb-3 px-1">14:25 · 오늘 DOING 컬럼 비워둘 수 있을까요?</p>
+        ${window.notice("red", "본인 메시지만 삭제 가능", "owner 도 타인 메시지는 삭제 불가. API 직접 호출 시 403 NOT_OWNER")}
+        <button data-close class="w-full mt-2 px-4 py-3 rounded-xl text-sm font-bold text-ink-2 dark:text-dim">취소</button>`);
+      $("note").textContent = "타인 메시지에는 삭제 버튼 자체가 없음";
+    },
+    "mobile": () => {
+      base();
+      app.className = "mob flex-1 min-h-0 w-full max-w-[390px] mx-auto flex flex-col " +
+                      "bg-page dark:bg-canvas border-x border-line dark:border-edge";
+      $("keyboard").classList.remove("hidden");
+      input.value = "DB 마이그레이션은";
+      sizeInput();
+      $("note").textContent = "키보드 노출 시 메시지 영역 축소. 입력 포커스 중에는 폴링 5초 > 2초";
+    }
+  };
+
+  window.stateBar([
+    {key:"normal",       label:"정상"},
+    {key:"empty",        label:"빈 채팅"},
+    {key:"typing",       label:"입력 중"},
+    {key:"over",         label:"1000자 초과"},
+    {key:"poll-fail",    label:"폴링 실패"},
+    {key:"poll-new",     label:"새 메시지 도착"},
+    {key:"delete-own",   label:"내 메시지 삭제"},
+    {key:"delete-deny",  label:"타인 메시지 삭제 불가"},
+    {key:"mobile",       label:"모바일 풀스크린"}
+  ], (key) => STATES[key]());
+
+  // 상태 바가 세로로 눌리지 않게 고정
+  document.body.firstElementChild.classList.add("shrink-0");
+
+  // 전송 - 실제 연동 시 POST /api/teams/{id}/messages
+  const doSend = () => {
+    const v = input.value.trim();
+    if (!v || send.disabled) return;
+    const now = new Date();
+    BASE.push({
+      id: Date.now(), email: ME, name: "나", text: v,
+      at: String(now.getHours()).padStart(2,"0") + ":" + String(now.getMinutes()).padStart(2,"0")
+    });
+    input.value = "";
+    sizeInput();
+    counter.classList.add("hidden");
+    inputErr.classList.add("hidden");
+    draw(BASE);
+  };
+  send.onclick = doSend;
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); doSend(); }
+  });
+</script>
+</body>
+</html>

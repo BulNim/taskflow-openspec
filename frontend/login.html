@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TaskFlow - 로그인 / 회원가입</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="theme.js"></script>
+<script src="api.js"></script>
+</head>
+
+<body class="bg-page dark:bg-canvas text-ink dark:text-fg font-sans antialiased min-h-screen flex flex-col">
+
+<div class="absolute top-3 right-4 z-40" id="themeSlot"></div>
+
+<main class="flex-1 grid place-items-center px-5 py-10">
+  <div class="w-full max-w-[380px]">
+
+    <div class="flex items-center justify-center gap-2 mb-7">
+      <div class="w-9 h-9 rounded-xl bg-ink dark:bg-fg grid place-items-center text-white dark:text-canvas font-extrabold">T</div>
+      <span class="text-xl font-extrabold tracking-tight">TaskFlow</span>
+    </div>
+
+    <div class="rounded-2xl bg-white dark:bg-surface border border-line dark:border-edge p-6 sm:p-7">
+      <div id="boxExpired" class="hidden mb-5 rounded-xl bg-page dark:bg-chip border border-line dark:border-edge
+           border-l-[6px] border-l-red-dot px-3.5 py-2.5">
+        <p class="text-[13px] font-bold text-red-text dark:text-red-dot">세션 만료</p>
+        <p class="text-[12px] text-ink-2 dark:text-dim mt-0.5">24시간이 지나 다시 로그인 필요</p>
+      </div>
+
+      <h1 id="title" class="text-lg font-extrabold mb-1">로그인</h1>
+      <p id="sub" class="text-[13px] text-ink-2 dark:text-dim mb-6">팀 업무를 한 화면에서 추적</p>
+
+      <form id="form" class="space-y-4">
+        <div>
+          <label for="email" class="block text-xs font-bold mb-1.5">이메일</label>
+          <input id="email" type="email" placeholder="user@example.com" autocomplete="email"
+            class="w-full h-11 px-3.5 rounded-xl bg-page dark:bg-chip border border-line dark:border-edge
+                   text-sm placeholder:text-ink-3 dark:placeholder:text-dim
+                   focus:outline-none focus:border-blue-dot focus:ring-2 focus:ring-blue-dot/25 transition">
+          <p id="errEmail" class="hidden mt-1.5 text-[11px] font-semibold text-red-text dark:text-red-dot"></p>
+        </div>
+
+        <div>
+          <label for="pw" class="block text-xs font-bold mb-1.5">비밀번호</label>
+          <input id="pw" type="password" placeholder="8자 이상" autocomplete="current-password"
+            class="w-full h-11 px-3.5 rounded-xl bg-page dark:bg-chip border border-line dark:border-edge
+                   text-sm placeholder:text-ink-3 dark:placeholder:text-dim
+                   focus:outline-none focus:border-blue-dot focus:ring-2 focus:ring-blue-dot/25 transition">
+          <p id="errPw" class="hidden mt-1.5 text-[11px] font-semibold text-red-text dark:text-red-dot"></p>
+        </div>
+
+        <div id="boxErr" class="hidden rounded-xl bg-page dark:bg-chip border-l-[6px] border-red-dot px-3.5 py-2.5">
+          <p id="boxErrText" class="text-[12px] font-bold text-red-text dark:text-red-dot"></p>
+        </div>
+
+        <div id="boxOk" class="hidden rounded-xl bg-page dark:bg-chip border-l-[6px] border-green-dot px-3.5 py-2.5">
+          <p id="boxOkText" class="text-[12px] font-bold text-green-text dark:text-green-dot"></p>
+        </div>
+
+        <button id="submit" type="submit"
+          class="w-full h-11 rounded-xl bg-ink dark:bg-fg text-white dark:text-canvas text-sm font-bold
+                 hover:opacity-90 active:scale-[.99] disabled:opacity-60 transition">로그인</button>
+      </form>
+
+      <p id="switch" class="mt-5 text-center text-[13px] text-ink-2 dark:text-dim"></p>
+    </div>
+  </div>
+</main>
+
+<script>
+  document.getElementById("themeSlot").innerHTML = window.THEME_BTN;
+  window.initTheme();
+
+  const $ = (id) => document.getElementById(id);
+  const email = $("email"), pw = $("pw"), submit = $("submit"), form = $("form");
+
+  let mode = "login"; // "login" | "signup" - 한 화면에서 두 폼을 전환
+
+  // 이미 로그인된 상태로 들어오면 팀 소속 여부에 따라 칸반/팀선택으로 바로 보낸다.
+  if (window.Auth.getToken()) {
+    window.routeGuard({ requireAuth: true });
+  }
+  // api.js가 세션 만료 시 /login.html?expired=1 로 리다이렉트하므로, 그 경우 안내 박스를 보여준다.
+  const params = new URLSearchParams(location.search);
+  if (params.get("expired") === "1") $("boxExpired").classList.remove("hidden");
+
+  // 폼 전환/재제출 전 에러 표시를 모두 초기화.
+  const reset = () => {
+    ["errEmail", "errPw", "boxErr", "boxOk"].forEach((i) => $(i).classList.add("hidden"));
+    [email, pw].forEach((el) => el.classList.remove("border-red-dot"));
+    submit.disabled = false;
+  };
+  // 특정 입력 필드 아래에 인라인 에러 메시지를 표시.
+  const fieldErr = (id, input, msg) => {
+    $(id).textContent = msg;
+    $(id).classList.remove("hidden");
+    input.classList.add("border-red-dot");
+  };
+  // 폼 전체에 걸리는 에러/성공 배너를 표시 (예: 서버에서 온 401 메시지).
+  const box = (which, msg) => {
+    $(which === "err" ? "boxErrText" : "boxOkText").textContent = msg;
+    $(which === "err" ? "boxErr" : "boxOk").classList.remove("hidden");
+  };
+
+  // 로그인 <-> 회원가입 모드에 맞게 제목/버튼 문구/링크를 다시 그린다.
+  function renderMode() {
+    reset();
+    if (mode === "login") {
+      $("title").textContent = "로그인";
+      $("sub").textContent = "팀 업무를 한 화면에서 추적";
+      submit.textContent = "로그인";
+      $("switch").innerHTML = `계정이 없으신가요? <a href="#" id="toSignup" class="font-bold text-blue-text dark:text-blue-dot hover:underline">회원가입</a>`;
+      $("toSignup").onclick = (e) => { e.preventDefault(); mode = "signup"; renderMode(); };
+    } else {
+      $("title").textContent = "회원가입";
+      $("sub").textContent = "이메일과 비밀번호만 있으면 시작";
+      submit.textContent = "가입하기";
+      $("switch").innerHTML = `이미 계정이 있으신가요? <a href="#" id="toLogin" class="font-bold text-blue-text dark:text-blue-dot hover:underline">로그인</a>`;
+      $("toLogin").onclick = (e) => { e.preventDefault(); mode = "login"; renderMode(); };
+    }
+  }
+  renderMode();
+
+  // 서버 요청 전 클라이언트측 1차 검증 (이메일 형식 + 회원가입 시 비밀번호 8자 이상).
+  // 실제 최종 검증은 백엔드가 다시 하므로, 여기서는 불필요한 요청만 줄이는 역할.
+  function validate() {
+    reset();
+    let ok = true;
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRe.test(email.value)) {
+      fieldErr("errEmail", email, "올바른 이메일 형식이 아닙니다");
+      ok = false;
+    }
+    if (mode === "signup" && pw.value.length < 8) {
+      fieldErr("errPw", pw, "8자 이상 입력해주세요");
+      ok = false;
+    }
+    if (mode === "login" && pw.value.length === 0) {
+      fieldErr("errPw", pw, "비밀번호를 입력해주세요");
+      ok = false;
+    }
+    return ok;
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!validate()) return;
+
+    submit.disabled = true;
+    submit.textContent = "처리 중...";
+
+    try {
+      // mode에 따라 로그인/회원가입 엔드포인트를 호출. 둘 다 성공 시 토큰+team_id를 반환.
+      const path = mode === "login" ? "/auth/login" : "/auth/signup";
+      const data = await window.api(path, {
+        method: "POST",
+        body: { email: email.value.trim(), password: pw.value },
+      });
+      window.Auth.setToken(data.token);
+      box("ok", "성공! 이동 중...");
+      // team_id가 있으면 바로 칸반으로, 없으면(신규 가입 등) 팀 선택 화면으로.
+      location.href = data.user.team_id ? "/kanban.html" : "/team.html";
+    } catch (err) {
+      submit.disabled = false;
+      submit.textContent = mode === "login" ? "로그인" : "가입하기";
+      // 서버가 내려준 표준 에러 코드별로 한국어 메시지를 분기 표시.
+      if (err.code === "EMAIL_TAKEN") {
+        box("err", "이미 가입된 이메일입니다");
+      } else if (err.code === "VALIDATION_ERROR") {
+        box("err", "입력값을 다시 확인해주세요");
+      } else if (err.code === "INVALID_CREDENTIALS") {
+        box("err", "이메일 또는 비밀번호가 일치하지 않습니다");
+      } else {
+        box("err", err.message || "오류가 발생했습니다");
+      }
+    }
+  });
+</script>
+</body>
+</html>

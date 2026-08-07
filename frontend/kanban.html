@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TaskFlow - 칸반</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="theme.js"></script>
+<script src="api.js"></script>
+<script src="nav.js"></script>
+<style>
+  .snap-x-mandatory { scroll-snap-type: x mandatory; }
+  .snap-start-always { scroll-snap-align: start; scroll-snap-stop: always; }
+  .no-bar { -ms-overflow-style: none; scrollbar-width: none; }
+  .no-bar::-webkit-scrollbar { display: none; }
+</style>
+</head>
+
+<body class="bg-page dark:bg-canvas text-ink dark:text-fg font-sans antialiased min-h-screen flex flex-col">
+
+<div id="navSlot"></div>
+
+<div class="max-w-7xl w-full mx-auto px-3 sm:px-4 pt-4 pb-3 flex items-center gap-2">
+  <div class="inline-flex gap-1.5 text-xs" id="filters">
+    <button data-filter="all" class="px-3 py-1.5 rounded-full font-bold bg-ink dark:bg-fg text-white dark:text-canvas">전체</button>
+    <button data-filter="me" class="px-3 py-1.5 rounded-full font-bold bg-white dark:bg-chip border border-line dark:border-edge text-ink-2 dark:text-dim">@me</button>
+    <button data-filter="unassigned" class="px-3 py-1.5 rounded-full font-bold bg-white dark:bg-chip border border-line dark:border-edge text-ink-2 dark:text-dim">미할당</button>
+  </div>
+</div>
+
+<!-- 모바일 전용 컬럼 인디케이터: 현재 보고 있는 컬럼 표시 + 탭으로 이동 -->
+<div class="md:hidden max-w-7xl w-full mx-auto px-3 sm:px-4 pb-3">
+  <div id="colIndicator" class="grid grid-cols-3 gap-1.5"></div>
+</div>
+
+<main class="flex-1 w-full max-w-7xl mx-auto pb-24 md:pb-10">
+  <div id="board" class="flex md:grid md:grid-cols-3 gap-3 md:gap-4 px-3 sm:px-4
+                         overflow-x-auto md:overflow-visible snap-x-mandatory md:snap-none no-bar"></div>
+</main>
+
+<!-- 카드 상세 모달 -->
+<div id="modal" class="hidden fixed inset-0 z-50 grid place-items-center px-4">
+  <div class="absolute inset-0 bg-black/40" data-close></div>
+  <div class="relative w-full max-w-[440px] rounded-2xl bg-white dark:bg-surface border border-line dark:border-edge p-5">
+    <div class="flex items-start gap-2 mb-4">
+      <div>
+        <p id="mId" class="text-[11px] font-mono text-ink-3 dark:text-dim"></p>
+        <h2 id="mTitleView" class="text-base font-extrabold mt-0.5"></h2>
+      </div>
+      <button data-close class="ml-auto w-7 h-7 grid place-items-center rounded-lg text-ink-3 hover:bg-page dark:hover:bg-edge">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="space-y-3">
+      <div>
+        <label class="block text-xs font-bold mb-1.5">제목</label>
+        <input id="mTitle" class="w-full h-11 px-3.5 rounded-xl bg-page dark:bg-chip border border-line dark:border-edge text-sm focus:outline-none focus:border-blue-dot transition">
+      </div>
+      <div>
+        <label class="block text-xs font-bold mb-1.5">상태</label>
+        <div class="grid grid-cols-3 gap-2" id="mStatus"></div>
+      </div>
+      <div>
+        <label class="block text-xs font-bold mb-1.5">담당자</label>
+        <select id="mAssignee" class="w-full h-11 px-3.5 rounded-xl bg-page dark:bg-chip border border-line dark:border-edge text-sm focus:outline-none focus:border-blue-dot transition"></select>
+      </div>
+      <div>
+        <label class="block text-xs font-bold mb-1.5">마감일</label>
+        <input type="date" id="mDueDate" class="w-full h-11 px-3.5 rounded-xl bg-page dark:bg-chip border border-line dark:border-edge text-sm focus:outline-none focus:border-blue-dot transition">
+      </div>
+      <div id="mMeta" class="text-[12px] text-ink-2 dark:text-dim space-y-0.5"></div>
+      <div id="mPermNote" class="hidden text-[11px] font-semibold text-red-text dark:text-red-dot"></div>
+      <div class="flex gap-2 pt-1">
+        <button id="mSave" class="flex-1 h-11 rounded-xl bg-ink dark:bg-fg text-white dark:text-canvas text-sm font-bold">저장</button>
+        <button id="mDelete" class="h-11 px-4 rounded-xl bg-red-dot text-white text-sm font-bold">삭제</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 삭제 확인 -->
+<div id="confirmModal" class="hidden fixed inset-0 z-[60] grid place-items-center px-4">
+  <div class="absolute inset-0 bg-black/40"></div>
+  <div class="relative w-full max-w-[360px] rounded-2xl bg-white dark:bg-surface border border-line dark:border-edge p-5 text-center">
+    <p class="font-bold mb-1">이 카드를 삭제하시겠습니까?</p>
+    <p class="text-[12px] text-ink-2 dark:text-dim mb-4">되돌릴 수 없습니다</p>
+    <div class="flex gap-2">
+      <button id="cCancel" class="flex-1 h-11 rounded-xl border border-line dark:border-edge text-sm font-bold">취소</button>
+      <button id="cOk" class="flex-1 h-11 rounded-xl bg-red-dot text-white text-sm font-bold">삭제</button>
+    </div>
+  </div>
+</div>
+
+<button id="fab" class="md:hidden fixed bottom-5 right-5 z-40 w-14 h-14 rounded-full bg-ink dark:bg-fg text-white dark:text-canvas
+               shadow-lg grid place-items-center active:scale-95 transition" aria-label="카드 추가">
+  <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+</button>
+
+<!-- 상태 변경 시트 (모바일 길게 누르기 - 드래그 대체) -->
+<div id="sheet" class="hidden fixed inset-0 z-50">
+  <div class="absolute inset-0 bg-black/40" data-sheet-close></div>
+  <div class="absolute inset-x-0 bottom-0 rounded-t-2xl bg-white dark:bg-surface p-4 pb-7">
+    <div class="w-9 h-1 rounded-full bg-line dark:bg-edge mx-auto mb-4"></div>
+    <p id="sheetTitle" class="text-sm font-bold mb-3 px-1"></p>
+    <div class="space-y-1.5" id="sheetOptions"></div>
+    <button data-sheet-close class="w-full mt-3 px-4 py-3 rounded-xl text-sm font-bold text-ink-2 dark:text-dim">취소</button>
+  </div>
+</div>
+
+<script>
+  // id로 엘리먼트를 가져오는 짧은 헬퍼. jQuery가 아니라 순수 DOM API 래퍼일 뿐이다.
+  const $ = (id) => document.getElementById(id);
+
+  // 칸반 3컬럼 정의: 상태값(key), 표시 라벨, 배경색, 좌측 스트라이프 색(dot).
+  // 색은 카드 배경이 아니라 좌측 6px 띠와 라벨에만 쓴다 (디자인 시스템 규칙).
+  const COLS = [
+    { key: "TODO", label: "TODO", bg: "bg-[#FEF6DD] dark:bg-chip", dot: "blue" },
+    { key: "DOING", label: "DOING", bg: "bg-[#E8F1FC] dark:bg-chip", dot: "orange" },
+    { key: "DONE", label: "DONE", bg: "bg-[#E7F6EE] dark:bg-chip", dot: "green" },
+  ];
+
+  let me = null, team = null, tasks = [], filter = "all", editingTaskId = null;
+
+  // 이 태스크에 대해 상태변경/수정/삭제 권한이 있는지: creator 본인이거나 팀 owner여야 한다.
+  // 단순 담당자(assignee)라는 이유만으로는 권한이 생기지 않는다 (explore 단계 결정).
+  function isPermitted(task) {
+    return me && (task.creator_id === me.id || (team && team.owner_id === me.id));
+  }
+
+  // due_date(YYYY-MM-DD)와 오늘 날짜(로컬 자정 기준)를 비교해 D-day 배지 문구와
+  // 초과 여부를 계산한다. 서버는 초과 여부를 판단하지 않고 날짜만 내려준다(design.md 결정 #2) -
+  // 매 렌더링 시 다시 계산하므로 화면을 오래 열어둬도 자정이 지나면 자동으로 갱신된다.
+  function dueDateInfo(task) {
+    if (!task.due_date) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const due = new Date(task.due_date + "T00:00:00");
+    const diffDays = Math.round((due - today) / 86400000);
+    const label = diffDays > 0 ? `D-${diffDays}` : diffDays === 0 ? "D-DAY" : `D+${-diffDays}`;
+    // DONE 태스크는 마감이 지났어도 강조하지 않는다 (kanban-tasks 스펙 - 마감 초과 카드 강조).
+    const overdue = diffDays < 0 && task.status !== "DONE";
+    return { label, overdue };
+  }
+
+  // 팀 멤버 목록을 불러와 owner_id를 알아낸다. 백엔드가 team 객체 자체에 role을 안 주므로
+  // 멤버 목록에서 role === "owner"인 사람을 찾아 owner_id로 사용한다 (isPermitted에서 씀).
+  async function loadTeam() {
+    const members = await window.api(`/teams/${me.team_id}/members`);
+    team = { owner_id: null };
+    team.members = members;
+    const myRow = members.find(m => m.id === me.id);
+    team.owner_id = myRow && myRow.role === "owner" ? me.id : (members.find(m => m.role === "owner") || {}).id;
+  }
+
+  // 현재 필터(전체/@me/미할당)에 맞춰 태스크 목록을 서버에서 다시 받아오고 보드를 재렌더링.
+  async function loadTasks() {
+    const q = filter === "all" ? "" : `?filter=${filter}`;
+    tasks = await window.api(`/teams/${me.team_id}/tasks${q}`);
+    renderBoard();
+  }
+
+  // 카드 한 장의 HTML. 담당자 없음/@me/타인 3가지 배지를 다르게 표시하고,
+  // 권한 없는 카드는 드래그를 비활성화(draggable=false)해 UI에서부터 시도를 막는다
+  // (서버도 어차피 403으로 막지만, 프론트에서 먼저 막아 불필요한 요청을 줄인다).
+  function cardHtml(task) {
+    const col = COLS.find(c => c.key === task.status);
+    const assignee = task.assignee_id == null
+      ? `<span class="text-[10px] font-bold text-orange-text dark:text-orange-dot">⚠ 미할당</span>`
+      : task.assignee_id === me.id
+        ? `<span class="text-[11px] text-ink-3 dark:text-dim">@me</span>`
+        : `<span class="text-[11px] text-ink-3 dark:text-dim">#${task.assignee_id}</span>`;
+    const draggable = isPermitted(task);
+
+    // 마감 초과(overdue)면 상태색 대신 항상 red 스트라이프로 오버라이드 (theme.js 토큰만 사용).
+    const due = dueDateInfo(task);
+    const stripeColor = due && due.overdue ? "red" : col.dot;
+    const dueBadge = due
+      ? `<span class="text-[10px] font-bold ${due.overdue ? "text-red-text dark:text-red-dot" : "text-ink-3 dark:text-dim"}">${due.label}</span>`
+      : "";
+
+    return `
+      <div class="task-card rounded-xl bg-white dark:bg-surface border border-line dark:border-edge border-l-[6px] border-l-${stripeColor}-dot
+                  px-3.5 py-3 ${draggable ? "cursor-grab" : "opacity-90 cursor-pointer"}"
+           data-id="${task.id}" draggable="${draggable}">
+        <p class="text-sm font-bold">${escapeHtml(task.title)}</p>
+        <div class="flex items-center gap-2 mt-1">
+          <span class="text-[11px] font-mono text-ink-3 dark:text-dim">#${task.id}</span>
+          ${assignee}
+          ${dueBadge}
+        </div>
+      </div>`;
+  }
+
+  // 사용자 입력(태스크 제목 등)을 innerHTML에 넣기 전 이스케이프해 XSS를 방지한다.
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  // 3개 컬럼 전체를 다시 그리고, 그 안의 모든 인터랙션(추가 버튼, 카드 클릭/드래그,
+  // 드롭존)을 새로 바인딩한다. 태스크가 바뀔 때마다(생성/이동/삭제/필터 변경) 호출된다.
+  function renderBoard() {
+    $("board").innerHTML = COLS.map((col) => {
+      const items = tasks.filter((t) => t.status === col.key);
+      return `
+        <div class="snap-start-always shrink-0 w-[calc(100vw-1.5rem)] sm:w-[360px] md:w-auto rounded-2xl ${col.bg} p-3" data-col="${col.key}">
+          <div class="flex items-center justify-between mb-2 px-1">
+            <span class="text-xs font-extrabold">${col.label} · ${items.length}</span>
+            <button data-add="${col.key}" class="w-6 h-6 grid place-items-center rounded-lg hover:bg-white/50 dark:hover:bg-white/10 font-bold">+</button>
+          </div>
+          <div class="drop-zone space-y-2 min-h-[80px]" data-col="${col.key}">
+            ${items.length
+              ? items.map(cardHtml).join("")
+              : `<div class="grid place-items-center py-8 text-center rounded-xl border-2 border-dashed border-line dark:border-edge">
+                   <p class="text-[12px] font-semibold text-ink-3 dark:text-dim">카드 없음</p>
+                 </div>`}
+            <div class="inline-form hidden" data-col="${col.key}">
+              <input class="w-full h-10 px-3 rounded-lg border border-line dark:border-edge bg-white dark:bg-chip text-sm" placeholder="제목 입력 후 Enter">
+            </div>
+          </div>
+        </div>`;
+    }).join("");
+
+    // 컬럼 헤더의 "+" 버튼 - 인라인 입력창을 펼치고, Enter로 저장 / Esc로 취소.
+    document.querySelectorAll("[data-add]").forEach((btn) => {
+      btn.onclick = () => {
+        const col = btn.dataset.add;
+        const form = document.querySelector(`.inline-form[data-col="${col}"]`);
+        form.classList.remove("hidden");
+        const input = form.querySelector("input");
+        input.focus();
+        input.onkeydown = async (e) => {
+          if (e.key === "Escape") { form.classList.add("hidden"); return; }
+          if (e.key !== "Enter" || !input.value.trim()) return;
+          try {
+            await window.api(`/teams/${me.team_id}/tasks`, { method: "POST", body: { title: input.value.trim() } });
+            input.value = "";
+            form.classList.add("hidden");
+            await loadTasks();
+          } catch (err) {
+            alert(err.message);
+          }
+        };
+      };
+    });
+
+    document.querySelectorAll(".task-card").forEach((card) => {
+      card.onclick = () => openModal(+card.dataset.id);
+      card.addEventListener("dragstart", (e) => {
+        e.dataTransfer.setData("text/plain", card.dataset.id);
+      });
+
+      // 모바일 길게 누르기 - 드래그 대신 상태 변경 시트 (터치 기기는 HTML5 DnD 미지원)
+      let pressTimer = null;
+      card.addEventListener("touchstart", () => {
+        pressTimer = setTimeout(() => openStatusSheet(+card.dataset.id), 450);
+      });
+      ["touchend", "touchmove", "touchcancel"].forEach((ev) =>
+        card.addEventListener(ev, () => clearTimeout(pressTimer))
+      );
+    });
+
+    // 데스크탑 드래그앤드롭: 카드를 드롭한 컬럼으로 PATCH /tasks/{id}/status를 호출.
+    // 서버가 403을 반환하면(권한 없음) 카드는 그대로 두고 안내만 표시한다.
+    document.querySelectorAll(".drop-zone").forEach((zone) => {
+      zone.addEventListener("dragover", (e) => e.preventDefault());
+      zone.addEventListener("drop", async (e) => {
+        e.preventDefault();
+        const id = +e.dataTransfer.getData("text/plain");
+        const newStatus = zone.dataset.col;
+        try {
+          await window.api(`/tasks/${id}/status`, { method: "PATCH", body: { status: newStatus } });
+          await loadTasks();
+        } catch (err) {
+          alert(err.status === 403 ? "권한이 없습니다 (담당자 또는 팀 owner만 이동 가능)" : err.message);
+        }
+      });
+    });
+
+    renderIndicator();
+  }
+
+  // 모바일 전용 컬럼 인디케이터(점 3개) - 현재 스크롤 위치에 맞는 컬럼을 강조 표시하고,
+  // 점을 탭하면 해당 컬럼으로 스크롤 이동한다 (좌우 스와이프의 보조 내비게이션).
+  function renderIndicator() {
+    $("colIndicator").innerHTML = COLS.map((col, i) => `
+      <button data-jump="${col.key}" data-idx="${i}"
+        class="h-1.5 rounded-full transition ${i === 0 ? "bg-ink dark:bg-fg" : "bg-line dark:bg-edge"}"></button>
+    `).join("");
+    document.querySelectorAll("[data-jump]").forEach((btn) => {
+      btn.onclick = () => {
+        document.querySelector(`[data-col="${btn.dataset.jump}"].snap-start-always`)
+          .scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
+      };
+    });
+    const board = $("board");
+    board.onscroll = () => {
+      const cols = [...document.querySelectorAll(".snap-start-always")];
+      const boardRect = board.getBoundingClientRect();
+      let closest = 0, closestDist = Infinity;
+      cols.forEach((el, i) => {
+        const dist = Math.abs(el.getBoundingClientRect().left - boardRect.left);
+        if (dist < closestDist) { closestDist = dist; closest = i; }
+      });
+      document.querySelectorAll("[data-jump]").forEach((b, i) => {
+        b.classList.toggle("bg-ink", i === closest);
+        b.classList.toggle("dark:bg-fg", i === closest);
+        b.classList.toggle("bg-line", i !== closest);
+        b.classList.toggle("dark:bg-edge", i !== closest);
+      });
+    };
+  }
+
+  // 카드 클릭 시 여는 상세/수정 모달. 제목, 상태, 담당자를 한 번에 보여주고,
+  // 권한 없는 사용자에게는 모든 입력을 비활성화한 채 안내 문구만 표시한다 (읽기 전용).
+  function openModal(id) {
+    const task = tasks.find((t) => t.id === id);
+    editingTaskId = id;
+    $("mId").textContent = `#${task.id}`;
+    $("mTitleView").textContent = task.title;
+    $("mTitle").value = task.title;
+    const permitted = isPermitted(task);
+    $("mStatus").innerHTML = COLS.map((c) => `
+      <button data-status="${c.key}"
+        class="h-9 rounded-lg text-xs font-bold border ${task.status === c.key ? "bg-ink dark:bg-fg text-white dark:text-canvas border-ink dark:border-fg" : "border-line dark:border-edge"}">
+        ${c.label}
+      </button>`).join("");
+    $("mMeta").innerHTML = `
+      <p>생성자: #${task.creator_id}</p>
+      <p>생성 시각: ${new Date(task.created_at).toLocaleString("ko-KR")}</p>`;
+
+    // 담당자 select: "미할당" 옵션 + 현재 팀 멤버 목록. 현재 담당자를 selected로 표시.
+    const memberOptions = [`<option value="">미할당 (담당자 없음)</option>`]
+      .concat(
+        (team.members || []).map(
+          (m) => `<option value="${m.id}" ${m.id === task.assignee_id ? "selected" : ""}>${m.id === me.id ? "@me" : m.email}</option>`
+        )
+      );
+    $("mAssignee").innerHTML = memberOptions.join("");
+    $("mAssignee").disabled = !permitted;
+    $("mDueDate").value = task.due_date || "";
+    $("mDueDate").disabled = !permitted;
+
+    $("mPermNote").classList.toggle("hidden", permitted);
+    $("mPermNote").textContent = "creator 또는 팀 owner만 수정/삭제할 수 있습니다";
+    $("mTitle").disabled = !permitted;
+    $("mSave").disabled = !permitted;
+    $("mDelete").classList.toggle("hidden", !permitted);
+    document.querySelectorAll("#mStatus button").forEach((b) => {
+      b.disabled = !permitted;
+      b.onclick = () => {
+        document.querySelectorAll("#mStatus button").forEach((x) => x.classList.remove("bg-ink", "dark:bg-fg", "text-white", "dark:text-canvas", "border-ink", "dark:border-fg"));
+        b.classList.add("bg-ink", "dark:bg-fg", "text-white", "dark:text-canvas", "border-ink", "dark:border-fg");
+        b.dataset.selected = "1";
+      };
+    });
+
+    $("modal").classList.remove("hidden");
+  }
+
+  // 모바일 길게 누르기로 여는 상태 변경 시트. 드래그를 못 쓰는 터치 기기에서
+  // 드래그의 대체 수단으로, 현재 상태를 제외한 나머지 컬럼으로 바로 이동 버튼을 보여준다.
+  function openStatusSheet(id) {
+    const task = tasks.find((t) => t.id === id);
+    if (!isPermitted(task)) {
+      alert("담당자 또는 팀 owner만 상태를 변경할 수 있습니다");
+      return;
+    }
+    $("sheetTitle").textContent = task.title;
+    $("sheetOptions").innerHTML = COLS.filter((c) => c.key !== task.status)
+      .map(
+        (c) => `
+        <button data-move-to="${c.key}"
+          class="w-full text-left px-4 py-3 rounded-xl bg-page dark:bg-chip border-l-[6px] border-${c.dot}-dot text-sm font-bold">
+          ${c.label}로 이동
+        </button>`
+      )
+      .join("");
+    document.querySelectorAll("[data-move-to]").forEach((btn) => {
+      btn.onclick = async () => {
+        try {
+          await window.api(`/tasks/${id}/status`, { method: "PATCH", body: { status: btn.dataset.moveTo } });
+          $("sheet").classList.add("hidden");
+          await loadTasks();
+        } catch (err) {
+          alert(err.message);
+        }
+      };
+    });
+    $("sheet").classList.remove("hidden");
+  }
+  document.querySelectorAll("[data-sheet-close]").forEach((el) => el.addEventListener("click", () => $("sheet").classList.add("hidden")));
+
+  document.querySelectorAll("[data-close]").forEach((el) => el.addEventListener("click", () => $("modal").classList.add("hidden")));
+
+  // 모달 저장: 제목/담당자는 PUT으로, 상태가 바뀌었으면 별도로 PATCH .../status도 호출한다
+  // (두 엔드포인트가 의도적으로 분리되어 있으므로 필요할 때만 두 번째 요청을 보낸다).
+  $("mSave").onclick = async () => {
+    const task = tasks.find((t) => t.id === editingTaskId);
+    const selectedBtn = document.querySelector("#mStatus button.bg-ink, #mStatus button.dark\\:bg-fg");
+    const newStatus = selectedBtn ? selectedBtn.dataset.status : task.status;
+    const assigneeVal = $("mAssignee").value;
+    const assigneeId = assigneeVal === "" ? null : +assigneeVal;
+    const dueDateVal = $("mDueDate").value || null;
+    try {
+      await window.api(`/tasks/${editingTaskId}`, { method: "PUT", body: { title: $("mTitle").value.trim(), assignee_id: assigneeId, due_date: dueDateVal } });
+      if (newStatus !== task.status) {
+        await window.api(`/tasks/${editingTaskId}/status`, { method: "PATCH", body: { status: newStatus } });
+      }
+      $("modal").classList.add("hidden");
+      await loadTasks();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  // 삭제는 즉시 실행하지 않고 확인 다이얼로그를 한 번 더 거친다 (되돌릴 수 없는 작업).
+  $("mDelete").onclick = () => {
+    $("confirmModal").classList.remove("hidden");
+  };
+  $("cCancel").onclick = () => $("confirmModal").classList.add("hidden");
+  $("cOk").onclick = async () => {
+    try {
+      await window.api(`/tasks/${editingTaskId}`, { method: "DELETE" });
+      $("confirmModal").classList.add("hidden");
+      $("modal").classList.add("hidden");
+      await loadTasks();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  // 상단 필터 탭(전체/@me/미할당) - 클릭한 탭만 강조 스타일로 바꾸고 목록을 다시 불러온다.
+  document.querySelectorAll("#filters button").forEach((btn) => {
+    btn.onclick = () => {
+      filter = btn.dataset.filter;
+      document.querySelectorAll("#filters button").forEach((b) => {
+        b.classList.remove("bg-ink", "dark:bg-fg", "text-white", "dark:text-canvas");
+        b.classList.add("bg-white", "dark:bg-chip", "border", "border-line", "dark:border-edge", "text-ink-2", "dark:text-dim");
+      });
+      btn.classList.add("bg-ink", "dark:bg-fg", "text-white", "dark:text-canvas");
+      btn.classList.remove("bg-white", "dark:bg-chip", "border", "border-line", "dark:border-edge", "text-ink-2", "dark:text-dim");
+      loadTasks();
+    };
+  });
+
+  // 모바일 전용 FAB(+) 버튼: TODO 컬럼으로 스크롤 이동 후 인라인 입력창을 바로 연다.
+  $("fab").onclick = () => {
+    const form = document.querySelector('.inline-form[data-col="TODO"]');
+    document.querySelector('[data-col="TODO"]').scrollIntoView({ behavior: "smooth" });
+    form.classList.remove("hidden");
+    form.querySelector("input").focus();
+  };
+
+  // 진입점: 로그인 + 팀 소속 여부를 확인한 뒤(routeGuard) 팀 정보와 태스크를 불러온다.
+  (async () => {
+    me = await window.routeGuard({ requireAuth: true, requireTeam: true });
+    if (!me) return;
+    window.renderNav("kanban", me);
+    await loadTeam();
+    await loadTasks();
+  })();
+</script>
+</body>
+</html>
